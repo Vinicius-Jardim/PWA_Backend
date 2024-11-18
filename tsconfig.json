@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "target": "ESNext",                   // Versão alvo de JS
+      "module": "CommonJS",                // Sistema de módulos usado
+      "rootDir": "./src",                  // Diretório raiz do projeto
+      "outDir": "./dist",                  // Diretório de saída para arquivos compilados
+      "strict": true,                      // Habilita verificações rigorosas
+      "esModuleInterop": true,             // Suporte para importação de módulos comuns
+      "skipLibCheck": true,                // Ignora checagem de tipos de bibliotecas
+      "forceConsistentCasingInFileNames": true // Consistência em nomes de arquivos
+    },
+    "include": ["src"],                    // Arquivos/diretórios incluídos na compilação
+    "exclude": ["node_modules", "dist"]   // Arquivos/diretórios ignorados
+  }
+  
