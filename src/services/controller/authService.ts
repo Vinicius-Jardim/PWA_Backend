@@ -36,8 +36,8 @@ export class AuthService {
             });
 
             await newUser.save();
-
-            return { message: 'User registered successfully' };
+            const token = createToken(newUser);
+            return token;
         } catch (error) {
             console.error('Error during registration:', error, { stack: error });
             return { message: 'An unexpected error occurred' };
@@ -60,7 +60,7 @@ export class AuthService {
                 return { message: 'Invalid credentials' };
             }
             const token = createToken(user);
-            return { token};
+            return token;
         } catch (error) {
             console.error('Error during login:', error, { stack: error });
             return { message: 'An unexpected error occurred' };

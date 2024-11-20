@@ -6,14 +6,26 @@ export const AthleteController = {
   // Listar atletas com paginação
   getAthletes: async (req: Request, res: Response) => {
     try {
+      // Extrair dados de consulta (query params)
       const data = {
-        page: parseInt(req.query.page as string) || 1,
-        pageSize: parseInt(req.query.pageSize as string) || 10,
+        search: req.query.search as string || '',  // Se houver um termo de pesquisa
+        page: parseInt(req.query.page as string) || 1,    // Página (default: 1)
+        pageSize: parseInt(req.query.pageSize as string) || 10,  // Tamanho da página (default: 10)
       };
-      const result = AthleteService.getAthletes(data);
-      res.status(200).json(result);
+  
+      // Chamar o serviço com os dados extraídos
+      const result = await AthleteService.getAthletes(data);
+  
+      // Enviar os resultados de volta para o cliente
+      res.status(200).json({
+        athletes: result.athletes,
+        totalCount: result.totalCount,
+        totalPages: result.totalPages,
+        currentPage: result.currentPage,
+      });
     } catch (error) {
-      res.status(500).json({ message: 'Error fetching athletes', error });
+      // Caso haja algum erro, retornar uma mensagem de erro
+      res.status(500).json({ message: 'Error fetching athletes', error: error instanceof Error ? error.message : error });
     }
   },
 

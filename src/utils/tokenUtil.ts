@@ -36,11 +36,11 @@ interface UserDocument extends Document {
 }
 
 // Tipagem para a criação de token
-const createToken = (user: UserDocument): { auth: boolean, token: string } => {
+const createToken = (user: UserDocument): { token: string } => {
   const token = jwt.sign({ id: user._id, role: user.role }, config.secretKey, {
     expiresIn: config.expiresIn,
   });
-  return { auth: true, token };
+  return {token};
 };
 
 // Tipagem para o token de reset de senha
