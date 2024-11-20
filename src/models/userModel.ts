@@ -37,7 +37,7 @@ const UserSchema: Schema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: Object.values(roles), required: true },
+    role: { type: String, enum: Object.values(roles), required: true, default: roles.ATHLETE },
     belt: { type: String },
     age: { type: Number },
     gender: { type: String, enum: ['male', 'female'] },

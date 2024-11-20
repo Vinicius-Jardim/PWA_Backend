@@ -2,21 +2,19 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const config = {
-  //Port to run the server
+export const config = {
+  // Porta para rodar o servidor
   port: process.env.PORT || 5000,
 
-  //Connection to the database
-  mongooseConnection: process.env.DATABASE,
+  // Conexão com o banco de dados
+  mongooseConnection: process.env.DATABASE || '',
 
-  //Secret key for the JWT
-  secretKey: process.env.SECRET_KEY,
+  // Chave secreta para o JWT
+  secretKey: process.env.SECRET_KEY ? String(process.env.SECRET_KEY) : '',
 
-  //Salt rounds for the bcrypt
-  saltRounds: Number(process.env.SALT_ROUNDS),
+  // Salt rounds para o bcrypt
+  saltRounds: process.env.SALT_ROUNDS ? Number(process.env.SALT_ROUNDS) : 8,
 
-  //Expiration time for the JWT
-  expiresIn: Number(process.env.EXPIRES_IN),
+  // Tempo de expiração para o JWT
+  expiresIn: process.env.EXPIRES_IN || '1d', // '1d' como valor padrão
 };
-
-export default config;

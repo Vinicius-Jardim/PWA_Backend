@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import config from '../config'; // Importa a chave secreta do JWT
+import {config} from '../config'; // Importa a chave secreta do JWT
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { roles, roleHierarchy } from '../models/userModel'; // Importa os roles e roleHierarchy
 
