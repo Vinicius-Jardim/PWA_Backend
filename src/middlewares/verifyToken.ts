@@ -1,5 +1,5 @@
 import jwt, { JwtPayload } from "jsonwebtoken";
-import config from "../config";
+import {config} from "../config";
 import { HttpStatus } from "../utils/httpStatus";
 import { Request, Response, NextFunction } from "express";
 

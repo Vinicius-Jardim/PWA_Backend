@@ -12,8 +12,6 @@ export class AuthService {
         confirmPassword: string
     ) {
         try {
-
-            console.time('Check Required Fields');
             if (!name ||!email ||!password) {
                 return { message: 'Name, email, and password are required' };
             }
