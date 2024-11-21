@@ -1,5 +1,5 @@
 import jwt, { JwtPayload } from "jsonwebtoken";
-import {config} from "../config";
+import { config } from "../config";
 import { HttpStatus } from "../utils/httpStatus";
 import { Request, Response, NextFunction } from "express";
 
@@ -23,12 +23,18 @@ function Verify(token: string): Promise<DecodedToken> {
 }
 
 // Middleware para verificar o token no header de autorização
-function verifyToken(req: Request & { roleUser?: string; user?: string }, res: Response, next: NextFunction): void {
+function verifyToken(
+  req: Request & { roleUser?: string; user?: string },
+  res: Response,
+  next: NextFunction
+): void {
   const authorize = req.header("authorization");
   const token = authorize && authorize.split(" ")[1];
 
   if (!token) {
-    res.status(HttpStatus.BAD_REQUEST).send({ auth: false, message: "No token provided" });
+    res
+      .status(HttpStatus.BAD_REQUEST)
+      .send({ auth: false, message: "No token provided" });
     return;
   }
 

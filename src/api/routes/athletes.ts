@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authorizeRole} from '../../middlewares/authMiddleware';
-import { roleHierarchy, roles } from '../../models/userModel';
+import { roles } from '../../models/userModel';
 import { AthleteController } from '../../controllers/athleteController';
 const router = Router();
 

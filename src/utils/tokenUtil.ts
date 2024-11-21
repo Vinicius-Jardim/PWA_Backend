@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { Model, Document } from "mongoose";
+import { Document } from "mongoose";
 import { config } from "../config";
 
 // Tipo para o conteúdo decodificado do token
@@ -12,20 +12,32 @@ interface DecodedToken {
 const decodeToken = (token: string): Promise<DecodedToken | undefined> => {
   return new Promise((resolve, reject) => {
     // jwt.verify aceita (token, chave secreta, opções, callback)
-    jwt.verify(token, config.secretKey, (err: jwt.VerifyErrors | null, decoded: string | jwt.JwtPayload | undefined) => {
-      if (err) {
-        console.log("Error:", err);
-        reject(new Error("Failed to authenticate"));
-        return;
-      }
+    jwt.verify(
+      token,
+      config.secretKey,
+      (
+        err: jwt.VerifyErrors | null,
+        decoded: string | jwt.JwtPayload | undefined
+      ) => {
+        if (err) {
+          console.log("Error:", err);
+          reject(new Error("Failed to authenticate"));
+          return;
+        }
 
-      // Garantir que o tipo de `decoded` é DecodedToken
-      if (decoded && typeof decoded !== 'string' && 'id' in decoded && 'role' in decoded) {
-        resolve(decoded as DecodedToken);
-      } else {
-        reject(new Error("Failed to decode token"));
+        // Garantir que o tipo de `decoded` é DecodedToken
+        if (
+          decoded &&
+          typeof decoded !== "string" &&
+          "id" in decoded &&
+          "role" in decoded
+        ) {
+          resolve(decoded as DecodedToken);
+        } else {
+          reject(new Error("Failed to decode token"));
+        }
       }
-    });
+    );
   });
 };
 
@@ -40,7 +52,7 @@ const createToken = (user: UserDocument): { token: string } => {
   const token = jwt.sign({ id: user._id, role: user.role }, config.secretKey, {
     expiresIn: config.expiresIn,
   });
-  return {token};
+  return { token };
 };
 
 // Tipagem para o token de reset de senha
