@@ -80,7 +80,7 @@ export class AuthService {
         await validateCredential.save();
 
         const token = createToken(newUser);
-        return { token, role: givenRole };
+        return token;
       }
 
       const newUser = new User({
@@ -93,7 +93,7 @@ export class AuthService {
       await newUser.save();
       // Criar o token JWT para o novo usuário
       const token = createToken(newUser);
-      return { token, role: givenRole }; // Retorna o token e o papel do usuário
+      return token; // Retorna o token e o papel do usuário
     } catch (error) {
       console.error("Error during registration:", error, { stack: error });
       return { message: "An unexpected error occurred" };
