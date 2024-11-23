@@ -20,7 +20,7 @@ export const AuthController = {
   },
   login: async (req: Request, res: Response) => {
     try {
-      // Passando o `res` para o serviço de login
+  
       const result = await AuthService.login(req.body.email, req.body.password, res);
       res.status(200).json(result);
     } catch (error) {
