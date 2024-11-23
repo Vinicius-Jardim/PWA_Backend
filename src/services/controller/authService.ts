@@ -3,7 +3,17 @@ import Credential from "../../models/instructorCredential";
 import { comparePassword, createPassword } from "../../utils/passwordUtil";
 import { roles, RoleType } from "../../models/userModel";
 import { createToken } from "../../utils/tokenUtil";
-import { valid } from "joi";
+import { Response } from "express";
+
+// Função para definir o cookie de autenticação
+function setAuthCookie(res: Response, token: string) {
+  res.cookie("auth_token", token, {
+    httpOnly: true, //O cookie não fica acessível ao JavaScript no navegador
+    secure: false, // quando for true, só aceita conexões HTTPS
+    sameSite: "strict", // só permite que o cookie seja enviado se a requisição for do mesmo site
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+}
 
 export class AuthService {
   static async register(
@@ -70,7 +80,7 @@ export class AuthService {
         await validateCredential.save();
 
         const token = createToken(newUser);
-        return token;
+        return { token, role: givenRole };
       }
 
       const newUser = new User({
@@ -83,14 +93,14 @@ export class AuthService {
       await newUser.save();
       // Criar o token JWT para o novo usuário
       const token = createToken(newUser);
-      return token; // Retorna o token e o papel do usuário
+      return { token, role: givenRole }; // Retorna o token e o papel do usuário
     } catch (error) {
       console.error("Error during registration:", error, { stack: error });
       return { message: "An unexpected error occurred" };
     }
   }
 
-  static async login(email: string, password: string) {
+  static async login(email: string, password: string, res: Response) {
     try {
       if (!email || !password) {
         return { message: "Email and password are required" };
@@ -98,14 +108,19 @@ export class AuthService {
 
       const user = await User.findOne({ email });
       if (!user) {
-        return { message: "User not found" };
+        return res.status(404).json({ message: "User not found" });
       }
-
+      
       const isMatch = await comparePassword(password, user.password);
       if (!isMatch) {
-        return { message: "Invalid credentials" };
+        return res.status(401).json({ message: "Invalid credentials" });
       }
+      
       const token = createToken(user);
+
+      // Configura o cookie com o token JWT
+      setAuthCookie(res, token.token);
+
       return token;
     } catch (error) {
       console.error("Error during login:", error, { stack: error });
