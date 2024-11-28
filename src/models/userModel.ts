@@ -12,13 +12,24 @@ export const roleHierarchy = {
   [roles.ADMIN]: 3,
 };
 
+// Definição de belts
+export const belts = {
+  WHITE: "WHITE",
+  YELLOW: "YELLOW",
+  ORANGE: "ORANGE",
+  GREEN: "GREEN",
+  BLUE: "BLUE",
+  BROWN: "BROWN",
+  BLACK: "BLACK",
+} as const;
+
 // Interface para tipagem no TypeScript
 export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
   role: keyof typeof roles; // Vincula a interface ao roles
-  belt?: string; // Apenas para atletas
+  belt?: BeltType; // Apenas para atletas
   age?: number; // Apenas para atletas
   gender?: "male" | "female"; // Apenas para atletas
   monthlyFee?: number; // Apenas para atletas
@@ -45,13 +56,13 @@ const UserSchema: Schema = new Schema(
       required: true,
       default: roles.ATHLETE,
     },
-    belt: { type: String },
+    belt: { type: String , enum: Object.values(belts)}, // Graduação
     age: { type: Number },
-    gender: { type: String, enum: ["male", "female"] },
-    monthlyFee: { type: Number },
-    joinedDate: { type: Date, default: Date.now },
-    instructorId: { type: mongoose.Schema.Types.ObjectId, ref: "Credential" },
-    athletes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    gender: { type: String, enum: ["male", "female"] }, 
+    monthlyFee: { type: Number }, // Valor da mensalidade
+    joinedDate: { type: Date, default: Date.now }, // Data de entrada
+    instructorId: { type: mongoose.Schema.Types.ObjectId, ref: "Credential" }, // Only for athletes
+    athletes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Only for instructors
     examSchedule: [
       {
         date: { type: Date, required: true },
@@ -78,3 +89,4 @@ const UserSchema: Schema = new Schema(
 // Exporta o modelo
 export default mongoose.model<IUser>("User", UserSchema);
 export type RoleType = keyof typeof roles;
+export type BeltType = keyof typeof belts; 
