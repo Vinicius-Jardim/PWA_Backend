@@ -7,9 +7,6 @@ const router = Router();
 
 router.get('/all', verifyToken ,authorizeRole(roles.INSTRUCTOR), AthleteController.getAthletes);
 /*
-router.post('/', createAthlete);
-router.put('/:id', updateAthlete);
-router.delete('/:id', deleteAthlete);*/
-//router.get('/by-id/:id', verifyToken, AthleteController.getAthleteById);
-
+router.get('/by-id/:id', verifyToken, AthleteController.getAthleteById);
+*/
 export default router;

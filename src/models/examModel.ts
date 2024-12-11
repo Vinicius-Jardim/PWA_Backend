@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, model } from "mongoose";
+import { belts } from "./userModel";
 
 // Interface para o modelo Exam
 export interface IExam extends Document {
@@ -6,10 +7,10 @@ export interface IExam extends Document {
   date: Date; // Data do exame
   maxParticipants: number; // Limite máximo de participantes
   participants: mongoose.Types.ObjectId[]; // IDs dos atletas inscritos
-  beltLevel: string; // Graduação necessária para inscrição
+  beltLevel: string[]; // Graduação necessária para inscrição
   createdBy: mongoose.Types.ObjectId; // ID do instrutor que criou o exame
 }
-
+const BeltType = typeof belts;
 // Schema do Exam
 const ExamSchema: Schema = new Schema<IExam>(
   {
@@ -17,7 +18,7 @@ const ExamSchema: Schema = new Schema<IExam>(
     date: { type: Date, required: true }, // Data do exame
     maxParticipants: { type: Number, required: true, default: 10 }, // Máximo de inscritos
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "Athlete" }], // Referência aos atletas
-    beltLevel: { type: String, required: true }, // Graduação exigida
+    beltLevel: BeltType, // Graduação exigida
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Instructor",

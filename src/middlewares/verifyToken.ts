@@ -24,7 +24,7 @@ function Verify(token: string): Promise<DecodedToken> {
 
 // Middleware para verificar o token no header de autorização
 function verifyToken(
-  req: Request & { roleUser?: string; user?: string },
+  req: Request,
   res: Response,
   next: NextFunction
 ): void {
@@ -41,7 +41,7 @@ function verifyToken(
   Verify(token)
     .then((decoded) => {
       req.roleUser = decoded.role; // Adiciona o role ao request
-      req.user = decoded.id; // Adiciona o id do usuário ao request
+      req.user = { id: decoded.id, role: decoded.role }; // Adiciona o objeto user ao request
       next();
     })
     .catch(() => {
@@ -63,3 +63,4 @@ async function tokenPasswordReset(token: string): Promise<boolean> {
 }
 
 export { verifyToken, tokenPasswordReset };
+

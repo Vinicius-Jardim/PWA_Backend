@@ -32,7 +32,6 @@ export class InstructorCredentialService {
     pageSize: number = 10
   ) {
     try {
-      console.log("Initial filters:", filters);
 
       // Filtro de pesquisa (se houver)
       const searchQuery = filters.search
@@ -44,8 +43,7 @@ export class InstructorCredentialService {
       const isUsedFilter = { isUsed: filters.isUsed };
 
       const query = { ...searchQuery, ...isUsedFilter };
-      console.log("Final query:", query);
-
+      
       const totalCount = await Credential.countDocuments(query);
 
       const credentials = await Credential.find(query)
