@@ -1,12 +1,17 @@
-import bcrypt from "bcrypt";
-import {config} from "../config";
+import argon2 from "argon2";
 
-const comparePassword = (password: string, hash: string) => {
-  return bcrypt.compare(password, hash);
+const comparePassword = async (password: string, hash: string) => {
+  try {
+    const result = await argon2.verify(hash, password);
+    return result;
+  } catch (error) {
+    console.error("Error during password verification:", error);
+    throw error;
+  }
 };
 
 const createPassword = (password: string) => {
-  return bcrypt.hash(password, config.saltRounds);
+  return argon2.hash(password);
 };
 
 export { comparePassword, createPassword };

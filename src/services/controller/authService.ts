@@ -102,23 +102,30 @@ export class AuthService {
 
   static async login(email: string, password: string, res: Response) {
     try {
+      const startTime = Date.now();
+
       if (!email || !password) {
         return { message: "Email and password are required" };
       }
 
+      const findUserStart = Date.now();
       const user = await User.findOne({ email });
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
+      const comparePasswordStart = Date.now();
       const isMatch = await comparePassword(password, user.password);
+
       if (!isMatch) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
-      
+
+      const createTokenStart = Date.now();
       const token = createToken(user);
 
-      // Configura o cookie com o token JWT
+      const setCookieStart = Date.now();
       setAuthCookie(res, token.token);
 
       return token;

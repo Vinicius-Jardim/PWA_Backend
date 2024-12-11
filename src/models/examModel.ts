@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, model } from 'mongoose';
+import mongoose, { Schema, Document, model } from "mongoose";
 
 // Interface para o modelo Exam
 export interface IExam extends Document {
@@ -16,9 +16,13 @@ const ExamSchema: Schema = new Schema<IExam>(
     name: { type: String, required: true }, // Nome do exame
     date: { type: Date, required: true }, // Data do exame
     maxParticipants: { type: Number, required: true, default: 10 }, // Máximo de inscritos
-    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Athlete' }], // Referência aos atletas
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "Athlete" }], // Referência aos atletas
     beltLevel: { type: String, required: true }, // Graduação exigida
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Instructor', required: true }, // Criador
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Instructor",
+      required: true,
+    }, // Criador
   },
   {
     timestamps: true, // Adiciona campos de createdAt e updatedAt automaticamente
@@ -26,5 +30,6 @@ const ExamSchema: Schema = new Schema<IExam>(
 );
 
 // Exportação do modelo
-const Exam = model<IExam>('Exam', ExamSchema);
+const Exam = model<IExam>("Exam", ExamSchema);
 export default Exam;
+export { Exam };

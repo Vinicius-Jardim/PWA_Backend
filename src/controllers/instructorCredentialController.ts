@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import InstructorCredential from "../models/instructorCredential";
 import { InstructorCredentialService } from "../services/controller/instructorCredentialService";
 
 export const InstructorCredentialController = {
