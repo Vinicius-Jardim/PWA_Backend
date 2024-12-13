@@ -80,5 +80,53 @@ export const ExameController = {
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
+  },
+
+  register: async (req: Request, res: Response) => {
+    try {
+      const examId = req.params.examId;
+      const athleteId = req.user.id;
+
+      const result = await ExameService.registerForExam(examId, athleteId);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Error in exam registration:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to register for exam"
+      });
+    }
+  },
+
+  myExams: async (req: Request, res: Response) => {
+    try {
+      const athleteId = req.user.id;
+      const exams = await ExameService.getAthleteExams(athleteId);
+      res.status(200).json(exams);
+    } catch (error) {
+      console.error("Error fetching athlete exams:", error);
+      res.status(500).json({
+        message: "Failed to fetch exams"
+      });
+    }
+  },
+
+  updateResult: async (req: Request, res: Response) => {
+    try {
+      const { examId, athleteId, grade } = req.body;
+
+      if (!examId || !athleteId || !grade) {
+        return res.status(400).json({
+          message: "Missing required fields: examId, athleteId, and grade"
+        });
+      }
+
+      const result = await ExameService.updateExamResult(examId, athleteId, grade);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Error updating exam result:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to update exam result"
+      });
+    }
   }
 };

@@ -10,7 +10,7 @@ export interface IExam extends Document {
   beltLevel: string[]; // Graduação necessária para inscrição
   createdBy: mongoose.Types.ObjectId; // ID do instrutor que criou o exame
 }
-const BeltType = typeof belts;
+
 // Schema do Exam
 const ExamSchema: Schema = new Schema<IExam>(
   {
@@ -18,7 +18,11 @@ const ExamSchema: Schema = new Schema<IExam>(
     date: { type: Date, required: true }, // Data do exame
     maxParticipants: { type: Number, required: true, default: 10 }, // Máximo de inscritos
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Referência aos atletas
-    beltLevel: BeltType, // Graduação exigida
+    beltLevel: [{ 
+      type: String,
+      enum: Object.values(belts),
+      required: true 
+    }],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

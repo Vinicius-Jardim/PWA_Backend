@@ -1,47 +1,115 @@
-import { roles } from "../../models/userModel";
-import  User from "../../models/userModel";
+import { roles, belts } from "../../models/userModel";
+import User from "../../models/userModel";
 
 export class UserService {
   static async me(user: any) {
     try {
       const userData = await User.findById(user.id);
-        if (!userData) {
-          return { message: "User not found" };
+      if (!userData) {
+        return { message: "User not found" };
+      }
+      if (userData.role === roles.ATHLETE) {
+        const data = {
+          name: userData.name,
+          email: userData.email,
+          instructorId: userData.instructorId,
+          belt: userData.belt,
+          age: userData.age,
+          joinedDate: userData.joinedDate,
+          monthlyFee: userData.monthlyFee,
+          gender: userData.gender,
         }
-        if (userData.role === roles.ATHLETE) {
-            const data = {
-                name: userData.name,
-                email: userData.email,
-                instructorId: userData.instructorId,
-                belt: userData.belt,
-                age: userData.age,
-                joinedDate: userData.joinedDate,
-                monthlyFee: userData.monthlyFee,
-                gender: userData.gender,
-            }
-            return data;
+        return data;
+      }
+      if (userData.role === roles.INSTRUCTOR) {
+        const data = {
+          name: userData.name,
+          email: userData.email,
+          athletes: userData.athletes,
+          examSchedule: userData.examSchedule,
         }
-        if (userData.role === roles.INSTRUCTOR) {
-            const data = {
-                name: userData.name,
-                email: userData.email,
-                athletes: userData.athletes,
-                examSchedule: userData.examSchedule,
-            }
-            return data;
+        return data;
+      }
+      if (userData.role === roles.ADMIN) {
+        const data = {
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
         }
-        if (userData.role === roles.ADMIN) {
-            const data = {
-                name: userData.name,
-                email: userData.email,
-                role : userData.role,
-            }
-            return data;
-        }
-        return userData;
+        return data;
+      }
+      return userData;
     } catch (error) {
       console.error("Error fetching user data:", error, { stack: error });
       return { message: "An unexpected error occurred" };
+    }
+  }
+
+  static async updateAthleteBelt(athleteId: string, newBelt: string, instructorId: string) {
+    try {
+      // Verificar se o instrutor existe
+      const instructor = await User.findById(instructorId);
+      if (!instructor || instructor.role !== roles.INSTRUCTOR) {
+        throw new Error("Não autorizado: apenas instrutores podem atualizar faixas");
+      }
+
+      // Verificar se o atleta existe
+      const athlete = await User.findById(athleteId);
+      if (!athlete || athlete.role !== roles.ATHLETE) {
+        throw new Error("Atleta não encontrado");
+      }
+
+      // Verificar se a faixa é válida
+      if (!Object.values(belts).includes(newBelt)) {
+        throw new Error("Faixa inválida");
+      }
+
+      // Atualizar a faixa do atleta
+      athlete.belt = newBelt;
+      await athlete.save();
+
+      return {
+        message: "Faixa atualizada com sucesso",
+        athlete: {
+          id: athlete._id,
+          name: athlete.name,
+          belt: athlete.belt
+        }
+      };
+    } catch (error) {
+      console.error("Erro ao atualizar faixa:", error);
+      throw error;
+    }
+  }
+
+  static async getAthletes(instructorId: string, page: number = 1, limit: number = 10) {
+    try {
+      const instructor = await User.findById(instructorId);
+      if (!instructor || instructor.role !== roles.INSTRUCTOR) {
+        throw new Error("Não autorizado: apenas instrutores podem listar atletas");
+      }
+
+      const athletes = await User.find({
+        role: roles.ATHLETE
+      })
+        .select('name email belt createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .sort({ name: 1 });
+
+      const total = await User.countDocuments({ role: roles.ATHLETE });
+
+      return {
+        athletes,
+        pagination: {
+          total,
+          page,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      console.error("Erro ao buscar atletas:", error);
+      throw error;
     }
   }
 }

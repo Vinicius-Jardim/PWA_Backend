@@ -1,12 +1,21 @@
-import express from 'express';
-import { AuthController } from '../../controllers/authController';
-import { verifyToken } from '../../middlewares/verifyToken';
-import { UserController } from '../../controllers/userController';
+import express from "express";
+import { UserController } from "../../controllers/userController";
+import { AuthController } from "../../controllers/authController";
+import { verifyToken } from "../../middlewares/verifyToken";
+import { authorizeRole } from "../../middlewares/authMiddleware";
+import { roles } from "../../models/userModel";
 
 const router = express.Router();
 
-router.post('/register', AuthController.register);
-router.post('/login', AuthController.login);
-router.get('/me', verifyToken, UserController.me);
+// Rotas de autenticação
+router.post("/register", AuthController.register);
+router.post("/login", AuthController.login);
+
+// Rota para obter dados do usuário logado
+router.get("/me", verifyToken, UserController.me);
+
+// Rotas para gerenciamento de atletas (apenas para instrutores)
+router.get("/athletes", verifyToken, authorizeRole(roles.INSTRUCTOR), UserController.getAthletes);
+router.put("/athletes/:athleteId/belt", verifyToken, authorizeRole(roles.INSTRUCTOR), UserController.updateAthleteBelt);
 
 export default router;

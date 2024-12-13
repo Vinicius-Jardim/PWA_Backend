@@ -149,4 +149,120 @@ export class ExameService {
       throw new Error("Failed to fetch exams");
     }
   }
+
+  static async registerForExam(examId: string, athleteId: string) {
+    try {
+      const exam = await Exam.findById(examId);
+      if (!exam) {
+        throw new Error("Exam not found");
+      }
+
+      // Check if exam is full
+      if (exam.participants.length >= exam.maxParticipants) {
+        throw new Error("Exam is already full");
+      }
+
+      // Get athlete info
+      const athlete = await User.findById(athleteId);
+      if (!athlete || athlete.role !== roles.ATHLETE) {
+        throw new Error("Athlete not found");
+      }
+
+      // Check if athlete meets belt requirements
+      const athleteBelt = athlete.belt;
+      const allowedBelts = exam.beltLevel;
+      
+      console.log('Athlete Belt:', athleteBelt);
+      console.log('Allowed Belts:', allowedBelts);
+      
+      if (!allowedBelts.includes(athleteBelt)) {
+        throw new Error(`Athlete belt (${athleteBelt}) is not eligible for this exam. Required belts: ${allowedBelts.join(', ')}`);
+      }
+
+      // Check if athlete has any pending payments
+      const hasPendingPayments = athlete.payments?.some(
+        payment => payment.status === "pending"
+      );
+      if (hasPendingPayments) {
+        throw new Error("Cannot register for exam with pending payments");
+      }
+
+      // Check if athlete is already registered
+      const isAlreadyRegistered = exam.participants.some(
+        participantId => participantId.toString() === athleteId
+      );
+      
+      if (isAlreadyRegistered) {
+        throw new Error("Athlete is already registered for this exam");
+      }
+
+      // Register athlete for exam
+      exam.participants.push(athleteId);
+      await exam.save();
+
+      return {
+        message: "Successfully registered for exam",
+        exam: {
+          name: exam.name,
+          date: exam.date,
+          beltLevel: exam.beltLevel
+        }
+      };
+    } catch (error) {
+      console.error("Error registering for exam:", error);
+      throw error;
+    }
+  }
+
+  static async getAthleteExams(athleteId: string) {
+    try {
+      const exams = await Exam.find({ participants: athleteId })
+        .populate({
+          path: "createdBy",
+          model: User,
+          select: "name email"
+        })
+        .sort({ date: 1 });
+
+      return exams;
+    } catch (error) {
+      console.error("Error fetching athlete exams:", error);
+      throw new Error("Failed to fetch athlete exams");
+    }
+  }
+
+  static async updateExamResult(examId: string, athleteId: string, grade: string) {
+    try {
+      const exam = await Exam.findById(examId);
+      if (!exam) {
+        throw new Error("Exam not found");
+      }
+
+      const athlete = await User.findById(athleteId);
+      if (!athlete) {
+        throw new Error("Athlete not found");
+      }
+
+      // Add exam result to athlete's record
+      athlete.examResults.push({
+        examId: exam._id,
+        grade,
+        date: exam.date
+      });
+
+      await athlete.save();
+
+      return {
+        message: "Exam result recorded successfully",
+        result: {
+          examName: exam.name,
+          grade,
+          date: exam.date
+        }
+      };
+    } catch (error) {
+      console.error("Error updating exam result:", error);
+      throw error;
+    }
+  }
 }

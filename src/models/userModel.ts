@@ -6,6 +6,7 @@ export const roles = {
   INSTRUCTOR: "INSTRUCTOR",
   ADMIN: "ADMIN",
 } as const;
+
 export const roleHierarchy = {
   [roles.ATHLETE]: 1,
   [roles.INSTRUCTOR]: 2,
@@ -28,19 +29,17 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: keyof typeof roles; // Vincula a interface ao roles
-  belt?: BeltType; // Apenas para atletas
-  age?: number; // Apenas para atletas
-  gender?: "male" | "female"; // Apenas para atletas
-  monthlyFee?: number; // Apenas para atletas
-  joinedDate?: Date; // Apenas para atletas
-  instructorId?: Types.ObjectId; // Referência para instrutor, apenas para atletas
-  athletes?: Types.ObjectId[]; // Lista de atletas, apenas para instrutores
-  examSchedule?: { date: Date; location: string }[]; // Exames agendados, apenas para instrutores
-  payments?: { date: Date; amount: number; status: "paid" | "pending" }[]; // Histórico de pagamentos, apenas para atletas
-  examResults?: { examId: Types.ObjectId; grade: string; date: Date }[]; // Resultados de exames, apenas para atletas
-
-  // Métodos
+  role: keyof typeof roles;
+  belt?: keyof typeof belts;
+  age?: number;
+  gender?: "male" | "female";
+  monthlyFee?: number;
+  joinedDate?: Date;
+  instructorId?: Types.ObjectId;
+  athletes?: Types.ObjectId[];
+  examSchedule?: { date: Date; location: string }[];
+  payments?: { date: Date; amount: number; status: "paid" | "pending" }[];
+  examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -50,43 +49,50 @@ const UserSchema: Schema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: {
-      type: String,
-      enum: Object.values(roles),
-      required: true,
-      default: roles.ATHLETE,
+    role: { 
+      type: String, 
+      required: true, 
+      enum: Object.values(roles) 
     },
-    belt: { type: String , enum: Object.values(belts)}, // Graduação
+    belt: { 
+      type: String, 
+      enum: Object.values(belts),
+      default: function(this: { role?: string }) {
+        return this.role === roles.ATHLETE ? belts.WHITE : undefined;
+      }
+    },
     age: { type: Number },
-    gender: { type: String, enum: ["male", "female"] }, 
-    monthlyFee: { type: Number }, // Valor da mensalidade
-    joinedDate: { type: Date, default: Date.now }, // Data de entrada
-    instructorId: { type: mongoose.Schema.Types.ObjectId, ref: "Credential" }, // Only for athletes
-    athletes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Only for instructors
-    examSchedule: [
-      {
-        date: { type: Date, required: true },
-        location: { type: String, required: true },
-      },
-    ],
-    payments: [
-      {
-        date: { type: Date, required: true },
-        amount: { type: Number, required: true },
-        status: { type: String, enum: ["paid", "pending"], required: true },
-      },
-    ],
-    examResults: [
-      {
-        examId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        grade: { type: String, required: true },
-        date: { type: Date, required: true },
-      },
-    ],
+    gender: { type: String, enum: ["male", "female"] },
+    monthlyFee: { type: Number },
+    joinedDate: { type: Date, default: Date.now },
+    instructorId: { type: Schema.Types.ObjectId, ref: "User" },
+    athletes: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    examSchedule: [{
+      date: Date,
+      location: String
+    }],
+    payments: [{
+      date: Date,
+      amount: Number,
+      status: { type: String, enum: ["paid", "pending"] }
+    }],
+    examResults: [{
+      examId: { type: Schema.Types.ObjectId, ref: "Exam" },
+      grade: String,
+      date: Date
+    }]
   },
-  { timestamps: true }
+  {
+    timestamps: true
+  }
 );
-// Exporta o modelo
-export default mongoose.model<IUser>("User", UserSchema);
+
+// Método para verificar permissões
+UserSchema.methods.hasPermission = function(requiredRole: keyof typeof roles) {
+  return roleHierarchy[this.role] >= roleHierarchy[requiredRole];
+};
+
+const User = mongoose.model<IUser>("User", UserSchema);
+export default User;
 export type RoleType = keyof typeof roles;
-export type BeltType = keyof typeof belts; 
+export type BeltType = keyof typeof belts;

@@ -1,42 +1,39 @@
 import User from '../../models/userModel';
 
 export class AthleteService {
-  static async getAthletes(
-    filters: { role?: string; search?: string } = {},
-    page: number = 1,
-    pageSize: number = 10
-  ) {
+  static async getAthletes({ search = "", page = 1, pageSize = 10 }) {
     try {
+      // Filtro base para role ATHLETE
+      const roleFilter = { role: 'ATHLETE' };
 
-      // Garantir que o filtro role seja 'ATHLETE'
-      const roleFilter = { role: 'ATHLETE'};
+      // Filtro de busca se houver termo de pesquisa
+      const searchQuery = search ? {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+        ],
+      } : {};
 
-      // Se existir um valor para 'search', cria um filtro de busca
-      const searchQuery = filters.search
-        ? {
-            $or: [
-              { name: { $regex: filters.search, $options: 'i' } },
-              { email: { $regex: filters.search, $options: 'i' } },
-            ],
-          }
-        : {};
-
-      // Construir a query final
+      // Query final
       const query = { ...roleFilter, ...searchQuery };
 
-      // Calcular a quantidade total de documentos que atendem ao filtro
+      // Contar total de atletas
       const totalCount = await User.countDocuments(query);
 
-      // Obter a lista de atletas com a consulta de paginação
+      // Buscar atletas com campos específicos
       const athletes = await User.find(query)
-        .skip((page - 1) * pageSize) // Calcula o offset
-        .limit(pageSize) // Limita os resultados de acordo com o tamanho da página
-        .exec();
+        .select('name email belt createdAt gender age monthlyFee') // Incluindo campos relevantes
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .sort({ name: 1 }) // Ordenar por nome
+        .lean(); // Converter para objeto JavaScript puro
 
-      // Retornar a resposta com os dados de paginação
       return {
         totalCount,
-        athletes,
+        athletes: athletes.map(athlete => ({
+          ...athlete,
+          belt: athlete.belt || 'Branca' // Se não tiver faixa, assume Branca
+        })),
         totalPages: Math.ceil(totalCount / pageSize),
         currentPage: page,
       };
@@ -46,4 +43,3 @@ export class AthleteService {
     }
   }
 }
-
