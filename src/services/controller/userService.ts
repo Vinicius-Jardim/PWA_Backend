@@ -4,7 +4,7 @@ import  User from "../../models/userModel";
 export class UserService {
   static async me(user: any) {
     try {
-        const userData = await User.findById(user);
+        const userData = await User.findById(user.id);
         if (!userData) {
           return { message: "User not found" };
         }
