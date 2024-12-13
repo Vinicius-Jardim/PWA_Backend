@@ -17,11 +17,11 @@ const ExamSchema: Schema = new Schema<IExam>(
     name: { type: String, required: true }, // Nome do exame
     date: { type: Date, required: true }, // Data do exame
     maxParticipants: { type: Number, required: true, default: 10 }, // Máximo de inscritos
-    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "Athlete" }], // Referência aos atletas
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Referência aos atletas
     beltLevel: BeltType, // Graduação exigida
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Instructor",
+      ref: "User",
       required: true,
     }, // Criador
   },

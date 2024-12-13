@@ -74,4 +74,79 @@ export class ExameService {
       throw new Error("Failed to fetch exams: " + error);
     }
   }
+
+  static async getAllExams(
+    filters: {
+      search?: string;
+      beltLevel?: string;
+      startDate?: Date;
+      endDate?: Date;
+      hasVacancy?: boolean;
+    } = {},
+    sort: { [key: string]: 1 | -1 } = { date: 1 },
+    page: number = 1,
+    limit: number = 10
+  ) {
+    try {
+      // Build search query
+      const query: any = {};
+
+      // Search by name
+      if (filters.search) {
+        query.name = { $regex: filters.search, $options: "i" };
+      }
+
+      // Filter by belt level
+      if (filters.beltLevel) {
+        query.beltLevel = filters.beltLevel;
+      }
+
+      // Filter by date range
+      if (filters.startDate || filters.endDate) {
+        query.date = {};
+        if (filters.startDate) {
+          query.date.$gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          query.date.$lte = new Date(filters.endDate);
+        }
+      }
+
+      // Filter by vacancy
+      if (filters.hasVacancy) {
+        query.$expr = {
+          $lt: [{ $size: "$participants" }, "$maxParticipants"]
+        };
+      }
+
+      // Count total documents
+      const totalExams = await Exam.countDocuments(query);
+
+      // Get paginated and sorted results
+      const exams = await Exam.find(query)
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate({
+          path: "createdBy",
+          model: User,
+          select: "name email role",
+          match: { role: roles.INSTRUCTOR }
+        })
+        .exec();
+
+      return {
+        exams,
+        pagination: {
+          total: totalExams,
+          totalPages: Math.ceil(totalExams / limit),
+          currentPage: page,
+          limit
+        }
+      };
+    } catch (error) {
+      console.error("Error fetching all exams:", error);
+      throw new Error("Failed to fetch exams");
+    }
+  }
 }

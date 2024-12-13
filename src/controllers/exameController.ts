@@ -44,5 +44,41 @@ export const ExameController = {
     } catch (error) {
       res.status(500).json({ error: error });
     }
+  },
+
+  all: async (req: Request, res: Response) => {
+    try {
+      // Extract query parameters
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const beltLevel = req.query.beltLevel as string;
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const hasVacancy = req.query.hasVacancy === 'true';
+      const sortField = (req.query.sortField as string) || 'date';
+      const sortOrder = parseInt(req.query.sortOrder as string) || 1;
+
+      // Build filters object
+      const filters = {
+        ...(search && { search }),
+        ...(beltLevel && { beltLevel }),
+        ...(startDate && { startDate: new Date(startDate) }),
+        ...(endDate && { endDate: new Date(endDate) }),
+        ...(req.query.hasVacancy !== undefined && { hasVacancy })
+      };
+
+      // Build sort object
+      const sort = { [sortField]: sortOrder };
+
+      const result = await ExameService.getAllExams(filters, sort, page, limit);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in getAllExams controller:', error);
+      res.status(500).json({ 
+        message: "Failed to fetch exams",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 };
