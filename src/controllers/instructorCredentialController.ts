@@ -49,7 +49,7 @@ export const InstructorCredentialController = {
       const result = await InstructorCredentialService.getById(
         req.params.id,
         req.roleUser,
-        req.user
+        req.user.id
       );
       res.status(200).json(result);
     } catch (error) {
