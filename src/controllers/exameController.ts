@@ -44,5 +44,22 @@ export const ExameController = {
     } catch (error) {
       res.status(500).json({ error: error });
     }
-  }
+  },
+
+  all: async (req: Request, res: Response) => {
+    try {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const search = (req.query.search as string) || "";
+        const beltLevel = (req.query.beltLevel as string) || "";
+
+        // Chamando o serviço com os parâmetros de paginação, busca e nível de cinto
+        const result = await ExameService.getAllExams(page, limit, search, beltLevel);
+
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(500).json({ error: error || error });
+    }
+}
+
 };
