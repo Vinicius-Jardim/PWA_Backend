@@ -1,6 +1,8 @@
 import Exam, { IExam } from "../../models/examModel";
 import { validateBeltLevels } from "../../utils/beltValidator";
+import { FilterQuery } from "mongoose";
 import User, { roles, belts } from "../../models/userModel";
+import { Op } from "sequelize";
 
 export class ExameService {
   static async create(exame: IExam, instructorId: { id: string; role: string }): Promise<IExam> {

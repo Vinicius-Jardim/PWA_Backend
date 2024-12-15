@@ -6,9 +6,9 @@ import { roles } from "../../models/userModel";
 
 const router = express.Router();
 
-router.post("/create", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.create);
-router.get("/own", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.own);
-router.get("/all", verifyToken, ExameController.all);
+router.post("/create", verifyToken, authorizeRole(roles.INSTRUCTOR),ExameController.create);
+router.get("/own", verifyToken,authorizeRole(roles.INSTRUCTOR), ExameController.own);
+router.get("/all", verifyToken, authorizeRole(roles.ATHLETE), ExameController.all);
 router.post("/register/:examId", verifyToken, authorizeRole(roles.ATHLETE), ExameController.register);
 router.get("/my-exams", verifyToken, authorizeRole(roles.ATHLETE), ExameController.myExams);
 router.post("/result", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.updateResult);
