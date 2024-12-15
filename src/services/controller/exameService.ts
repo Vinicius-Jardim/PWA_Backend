@@ -1,7 +1,9 @@
 import Exam, { IExam } from "../../models/examModel";
 import { validateBeltLevels } from "../../utils/beltValidator";
 import { FilterQuery } from "mongoose";
+import { FilterQuery } from "mongoose";
 import User, { roles, belts } from "../../models/userModel";
+import { Op } from "sequelize";
 import { Op } from "sequelize";
 
 export class ExameService {
