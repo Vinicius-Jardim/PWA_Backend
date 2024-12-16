@@ -22,4 +22,18 @@ export const InstructorController = {
       });
     }
   },
+
+  joinInstrutor: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const result = await InstructorService.joinInstructor(id, req.user.id);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Error in joinInstructor controller:", error);
+      res.status(500).json({
+        message: "Error joining instructor",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
 };

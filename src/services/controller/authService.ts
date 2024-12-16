@@ -1,18 +1,19 @@
-import User from "../../models/userModel";
+import User, { IUser } from "../../models/userModel";
 import Credential from "../../models/instructorCredential";
 import { comparePassword, createPassword } from "../../utils/passwordUtil";
 import { roles, RoleType } from "../../models/userModel";
 import { createToken } from "../../utils/tokenUtil";
-import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
 import { Response } from "express";
+import { Schema } from "mongoose";
 import { config } from "../../config";
 
 // Função para definir o cookie de autenticação
 const setAuthCookie = (res: Response, token: string) => {
-  res.cookie('token', token, {
+  res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 1 dia
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000, // 1 dia
   });
 };
 
@@ -21,7 +22,7 @@ export class AuthService {
     name: string,
     email: string,
     password: string,
-    instructorId: string,
+    instructorId: string | null,
     confirmPassword: string
   ) {
     try {
@@ -44,9 +45,15 @@ export class AuthService {
       // Criar o hash da senha
       const hashPassword = await createPassword(password);
 
-      // Determinar o papel (role) do usuário
-      let givenRole: RoleType = roles.ATHLETE; // Valor padrão: "ATHLETE"
-      let credential = null;
+      // Inicializar os dados básicos do novo usuário
+      let newUserData: Partial<IUser> = {
+        name,
+        email,
+        password: hashPassword,
+        role: roles.ATHLETE, // Valor padrão: "ATHLETE"
+      };
+
+      // Caso o `instructorId` seja fornecido, configurar como "INSTRUCTOR"
       if (instructorId) {
         const validateCredential = await Credential.findOne({
           instructorId,
@@ -59,42 +66,36 @@ export class AuthService {
           };
         }
 
-        // Marcar a credencial como usada
+        // Atualizar credencial como usada
         validateCredential.isUsed = true;
         validateCredential.updatedAt = new Date();
         await validateCredential.save();
 
-        // Atualizar o papel para "INSTRUCTOR"
-        credential = validateCredential._id;
-        givenRole = roles.INSTRUCTOR;
+        // Atualizar papel para "INSTRUCTOR" e adicionar credenciais
+        newUserData = {
+          ...newUserData,
+          role: roles.INSTRUCTOR,
+        };
 
-        const newUser = new User({
-          name,
-          email,
-          password: hashPassword,
-          instructorId: credential,
-          role: givenRole,
-        });
-
+        // Criar o usuário como "INSTRUCTOR"
+        const newUser = new User(newUserData);
         await newUser.save();
+
         validateCredential.user = newUser._id;
         await validateCredential.save();
 
+        // Criar o token JWT para o instrutor
         const token = createToken(newUser);
         return token;
       }
 
-      const newUser = new User({
-        name,
-        email,
-        password: hashPassword,
-        role: givenRole,
-      });
-      // Salvar o usuário no banco de dados
+      // Criar o usuário como "ATHLETE" sem atributos irrelevantes
+      const newUser = new User(newUserData);
       await newUser.save();
-      // Criar o token JWT para o novo usuário
+
+      // Criar o token JWT para o atleta
       const token = createToken(newUser);
-      return token; // Retorna o token e o papel do usuário
+      return token;
     } catch (error) {
       console.error("Error during registration:", error, { stack: error });
       return { message: "An unexpected error occurred" };
@@ -154,7 +155,10 @@ export class AuthService {
       }
 
       // Extrair ID do token
-      const decodedToken = jwt.verify(qrData.token, process.env.SECRET_KEY || 'supersecretkey') as any;
+      const decodedToken = jwt.verify(
+        qrData.token,
+        process.env.SECRET_KEY || "supersecretkey"
+      ) as any;
       const userId = decodedToken.id;
 
       if (!userId) {

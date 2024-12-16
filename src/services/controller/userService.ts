@@ -18,7 +18,7 @@ export class UserService {
           joinedDate: userData.joinedDate,
           monthlyFee: userData.monthlyFee,
           gender: userData.gender,
-        }
+        };
         return data;
       }
       if (userData.role === roles.INSTRUCTOR) {
@@ -27,7 +27,7 @@ export class UserService {
           email: userData.email,
           athletes: userData.athletes,
           examSchedule: userData.examSchedule,
-        }
+        };
         return data;
       }
       if (userData.role === roles.ADMIN) {
@@ -35,7 +35,7 @@ export class UserService {
           name: userData.name,
           email: userData.email,
           role: userData.role,
-        }
+        };
         return data;
       }
       return userData;
@@ -45,12 +45,18 @@ export class UserService {
     }
   }
 
-  static async updateAthleteBelt(athleteId: string, newBelt: string, instructorId: string) {
+  static async updateAthleteBelt(
+    athleteId: string,
+    newBelt: string,
+    instructorId: string
+  ) {
     try {
       // Verificar se o instrutor existe
       const instructor = await User.findById(instructorId);
       if (!instructor || instructor.role !== roles.INSTRUCTOR) {
-        throw new Error("Não autorizado: apenas instrutores podem atualizar faixas");
+        throw new Error(
+          "Não autorizado: apenas instrutores podem atualizar faixas"
+        );
       }
 
       // Verificar se o atleta existe
@@ -60,12 +66,16 @@ export class UserService {
       }
 
       // Verificar se a faixa é válida
-      if (!Object.values(belts).includes(newBelt)) {
+      if (
+        !Object.values(belts).includes(
+          newBelt as (typeof belts)[keyof typeof belts]
+        )
+      ) {
         throw new Error("Faixa inválida");
       }
 
       // Atualizar a faixa do atleta
-      athlete.belt = newBelt;
+      athlete.belt = newBelt as (typeof belts)[keyof typeof belts];
       await athlete.save();
 
       return {
@@ -73,8 +83,8 @@ export class UserService {
         athlete: {
           id: athlete._id,
           name: athlete.name,
-          belt: athlete.belt
-        }
+          belt: athlete.belt,
+        },
       };
     } catch (error) {
       console.error("Erro ao atualizar faixa:", error);
@@ -82,17 +92,23 @@ export class UserService {
     }
   }
 
-  static async getAthletes(instructorId: string, page: number = 1, limit: number = 10) {
+  static async getAthletes(
+    instructorId: string,
+    page: number = 1,
+    limit: number = 10
+  ) {
     try {
       const instructor = await User.findById(instructorId);
       if (!instructor || instructor.role !== roles.INSTRUCTOR) {
-        throw new Error("Não autorizado: apenas instrutores podem listar atletas");
+        throw new Error(
+          "Não autorizado: apenas instrutores podem listar atletas"
+        );
       }
 
       const athletes = await User.find({
-        role: roles.ATHLETE
+        role: roles.ATHLETE,
       })
-        .select('name email belt createdAt')
+        .select("name email belt createdAt")
         .skip((page - 1) * limit)
         .limit(limit)
         .sort({ name: 1 });
@@ -104,8 +120,8 @@ export class UserService {
         pagination: {
           total,
           page,
-          pages: Math.ceil(total / limit)
-        }
+          pages: Math.ceil(total / limit),
+        },
       };
     } catch (error) {
       console.error("Erro ao buscar atletas:", error);
