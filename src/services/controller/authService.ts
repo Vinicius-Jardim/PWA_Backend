@@ -3,18 +3,19 @@ import Credential from "../../models/instructorCredential";
 import { comparePassword, createPassword } from "../../utils/passwordUtil";
 import { roles, RoleType } from "../../models/userModel";
 import { createToken } from "../../utils/tokenUtil";
+import jwt from "jsonwebtoken";
 import { Response } from "express";
 import { Schema } from "mongoose";
+import { config } from "../../config";
 
 // Função para definir o cookie de autenticação
-function setAuthCookie(res: Response, token: string) {
-  res.cookie("auth_token", token, {
-    httpOnly: true, //O cookie não fica acessível ao JavaScript no navegador
-    secure: false, // quando for true, só aceita conexões HTTPS
-    sameSite: "strict", // só permite que o cookie seja enviado se a requisição for do mesmo site
-    maxAge: 24 * 60 * 60 * 1000,
+const setAuthCookie = (res: Response, token: string) => {
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000, // 1 dia
   });
-}
+};
 
 export class AuthService {
   static async register(
@@ -133,6 +134,65 @@ export class AuthService {
     } catch (error) {
       console.error("Error during login:", error, { stack: error });
       return { message: "An unexpected error occurred" };
+    }
+  }
+  static async loginWithQR(qrCode: string, res: Response) {
+    try {
+      if (!qrCode) {
+        throw new Error("QR code is required");
+      }
+
+      // Decodificar o QR code
+      let qrData;
+      try {
+        qrData = JSON.parse(qrCode);
+      } catch (error) {
+        throw new Error("Invalid QR code format");
+      }
+
+      if (!qrData.token) {
+        throw new Error("QR code missing token");
+      }
+
+      // Extrair ID do token
+      const decodedToken = jwt.verify(
+        qrData.token,
+        process.env.SECRET_KEY || "supersecretkey"
+      ) as any;
+      const userId = decodedToken.id;
+
+      if (!userId) {
+        throw new Error("Token missing user ID");
+      }
+
+      // Procurar usuário pelo ID do token
+      const user = await User.findById(userId);
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Atualizar o QR code do usuário
+      user.qrCode = qrCode;
+      await user.save();
+
+      // Criar token JWT
+      const token = createToken(user);
+
+      // Definir cookie de autenticação
+      setAuthCookie(res, token.token);
+
+      return {
+        message: "Login successful",
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
+        token: token.token,
+      };
+    } catch (error) {
+      throw error;
     }
   }
 }

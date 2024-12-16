@@ -27,4 +27,24 @@ export const AuthController = {
       res.status(500).json({ message: "Error logging in", error });
     }
   },
+
+  loginWithQR: async (req: Request, res: Response) => {
+    try {
+      const { qrCode } = req.body;
+      const result = await AuthService.loginWithQR(qrCode, res);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error("Error in loginWithQR controller:", error);
+      
+      if (error.message === "QR code is required") {
+        return res.status(400).json({ message: error.message });
+      }
+      if (error.message === "User not found") {
+        return res.status(404).json({ message: error.message });
+      }
+      
+      return res.status(500).json({ message: "Error logging in with QR code" });
+    }
+  }
+  
 };

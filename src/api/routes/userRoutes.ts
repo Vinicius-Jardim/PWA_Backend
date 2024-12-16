@@ -10,6 +10,7 @@ const router = express.Router();
 // Rotas de autenticação
 router.post("/register", AuthController.register);
 router.post("/login", AuthController.login);
+router.post("/login-qr", AuthController.loginWithQR);
 
 // Rota para obter dados do usuário logado
 router.get("/me", verifyToken, UserController.me);

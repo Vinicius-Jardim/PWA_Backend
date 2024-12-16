@@ -49,18 +49,21 @@ interface UserDocument extends Document {
 
 // Tipagem para a criação de token
 const createToken = (user: UserDocument): { token: string } => {
-  const token = jwt.sign({ id: user._id, role: user.role }, config.secretKey, {
-    expiresIn: config.expiresIn,
-  });
+  const token = jwt.sign(
+    { id: user._id, role: user.role },
+    config.secretKey,
+    { expiresIn: config.expiresIn }
+  );
   return { token };
 };
 
 // Tipagem para o token de reset de senha
 const createTokenPasswordReset = (user: UserDocument): string => {
-  const token = jwt.sign({ id: user._id }, config.secretKey, {
-    expiresIn: 300, // 5 minutos
-  });
-  return token;
+  return jwt.sign(
+    { id: user._id, role: user.role },
+    config.secretKey,
+    { expiresIn: '1h' }
+  );
 };
 
 export { decodeToken, createToken, createTokenPasswordReset };
