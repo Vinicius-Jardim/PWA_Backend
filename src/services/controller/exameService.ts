@@ -96,14 +96,8 @@ export class ExameService {
         query.beltLevel = { $in: [filters.beltLevel] }; // Usar $in para arrays
       }
 
-      // Debug: Log do filtro construído
-      console.log("Query Filters:", query);
-
       // Contar o total de exames correspondentes
       const totalExams = await Exam.countDocuments(query);
-
-      // Debug: Log da contagem total
-      console.log("Total Exams Found:", totalExams);
 
       if (totalExams === 0) {
         return {
@@ -122,9 +116,6 @@ export class ExameService {
         .skip((page - 1) * limit)
         .limit(limit)
         .exec();
-
-      // Debug: Log dos exames encontrados
-      console.log("Exams Found:", exams);
 
       return {
         exams,
