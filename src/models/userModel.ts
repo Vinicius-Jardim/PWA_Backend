@@ -40,6 +40,7 @@ export interface IUser extends Document {
   examSchedule?: { date: Date; location: string }[];
   payments?: { date: Date; amount: number; status: "paid" | "pending" }[];
   examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
+  qrCode?: string;
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -80,7 +81,8 @@ const UserSchema: Schema = new Schema(
       examId: { type: Schema.Types.ObjectId, ref: "Exam" },
       grade: String,
       date: Date
-    }]
+    }],
+    qrCode: { type: String }
   },
   {
     timestamps: true
