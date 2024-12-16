@@ -1,13 +1,14 @@
 import Exam, { IExam } from "../../models/examModel";
 import { validateBeltLevels } from "../../utils/beltValidator";
 import { FilterQuery } from "mongoose";
-import { FilterQuery } from "mongoose";
 import User, { roles, belts } from "../../models/userModel";
-import { Op } from "sequelize";
 import { Op } from "sequelize";
 
 export class ExameService {
-  static async create(exame: IExam, instructorId: { id: string; role: string }): Promise<IExam> {
+  static async create(
+    exame: IExam,
+    instructorId: { id: string; role: string }
+  ): Promise<IExam> {
     try {
       const { name, date, beltLevel, maxParticipants } = exame;
 
@@ -80,64 +81,50 @@ export class ExameService {
   }
 
   static async getAllExams(
-    filters: {
-      search?: string;
-      beltLevel?: string;
-      startDate?: Date;
-      endDate?: Date;
-      hasVacancy?: boolean;
-    } = {},
-    sort: { [key: string]: 1 | -1 } = { date: 1 },
+    filters: { beltLevel?: string } = {},
     page: number = 1,
     limit: number = 10
   ) {
     try {
-      // Build search query
+      // Validar valores de paginação
+      if (page < 1) page = 1;
+      if (limit < 1) limit = 10;
+
+      // Construir o filtro baseado no nível de faixa (beltLevel)
       const query: any = {};
-
-      // Search by name
-      if (filters.search) {
-        query.name = { $regex: filters.search, $options: "i" };
-      }
-
-      // Filter by belt level
       if (filters.beltLevel) {
-        query.beltLevel = filters.beltLevel;
+        query.beltLevel = { $in: [filters.beltLevel] }; // Usar $in para arrays
       }
 
-      // Filter by date range
-      if (filters.startDate || filters.endDate) {
-        query.date = {};
-        if (filters.startDate) {
-          query.date.$gte = new Date(filters.startDate);
-        }
-        if (filters.endDate) {
-          query.date.$lte = new Date(filters.endDate);
-        }
-      }
+      // Debug: Log do filtro construído
+      console.log("Query Filters:", query);
 
-      // Filter by vacancy
-      if (filters.hasVacancy) {
-        query.$expr = {
-          $lt: [{ $size: "$participants" }, "$maxParticipants"]
+      // Contar o total de exames correspondentes
+      const totalExams = await Exam.countDocuments(query);
+
+      // Debug: Log da contagem total
+      console.log("Total Exams Found:", totalExams);
+
+      if (totalExams === 0) {
+        return {
+          exams: [],
+          pagination: {
+            total: 0,
+            totalPages: 0,
+            currentPage: 1,
+            limit,
+          },
         };
       }
 
-      // Count total documents
-      const totalExams = await Exam.countDocuments(query);
-
-      // Get paginated and sorted results
+      // Obter os resultados paginados
       const exams = await Exam.find(query)
-        .sort(sort)
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate({
-          path: "createdBy",
-          model: User,
-          select: "name email role",
-          match: { role: roles.INSTRUCTOR }
-        })
         .exec();
+
+      // Debug: Log dos exames encontrados
+      console.log("Exams Found:", exams);
 
       return {
         exams,
@@ -145,11 +132,11 @@ export class ExameService {
           total: totalExams,
           totalPages: Math.ceil(totalExams / limit),
           currentPage: page,
-          limit
-        }
+          limit,
+        },
       };
     } catch (error) {
-      console.error("Error fetching all exams:", error);
+      console.error("Error fetching exams:", error);
       throw new Error("Failed to fetch exams");
     }
   }
@@ -158,34 +145,38 @@ export class ExameService {
     try {
       const exam = await Exam.findById(examId);
       if (!exam) {
-        throw new Error("Exam not found");
+        return "Exam not found";
       }
 
       // Check if exam is full
       if (exam.participants.length >= exam.maxParticipants) {
-        throw new Error("Exam is already full");
+        return "Exam is already full";
       }
 
       // Get athlete info
       const athlete = await User.findById(athleteId);
       if (!athlete || athlete.role !== roles.ATHLETE) {
-        throw new Error("Athlete not found");
+        return "Athlete not found";
+      }
+      if (!athlete.instructorId) {
+        return "Athlete does not have an instructor";
       }
 
       // Check if athlete meets belt requirements
       const athleteBelt = athlete.belt;
       const allowedBelts = exam.beltLevel;
-      
-      console.log('Athlete Belt:', athleteBelt);
-      console.log('Allowed Belts:', allowedBelts);
-      
-      if (!allowedBelts.includes(athleteBelt)) {
-        throw new Error(`Athlete belt (${athleteBelt}) is not eligible for this exam. Required belts: ${allowedBelts.join(', ')}`);
+
+      if (athleteBelt && !allowedBelts.includes(athleteBelt)) {
+        throw new Error(
+          `Athlete belt (${athleteBelt}) is not eligible for this exam. Required belts: ${allowedBelts.join(
+            ", "
+          )}`
+        );
       }
 
       // Check if athlete has any pending payments
       const hasPendingPayments = athlete.payments?.some(
-        payment => payment.status === "pending"
+        (payment) => payment.status === "pending"
       );
       if (hasPendingPayments) {
         throw new Error("Cannot register for exam with pending payments");
@@ -193,15 +184,15 @@ export class ExameService {
 
       // Check if athlete is already registered
       const isAlreadyRegistered = exam.participants.some(
-        participantId => participantId.toString() === athleteId
+        (participantId) => participantId.toString() === athleteId
       );
-      
+
       if (isAlreadyRegistered) {
         throw new Error("Athlete is already registered for this exam");
       }
 
       // Register athlete for exam
-      exam.participants.push(athleteId);
+      exam.participants.push(athlete._id);
       await exam.save();
 
       return {
@@ -209,8 +200,8 @@ export class ExameService {
         exam: {
           name: exam.name,
           date: exam.date,
-          beltLevel: exam.beltLevel
-        }
+          beltLevel: exam.beltLevel,
+        },
       };
     } catch (error) {
       console.error("Error registering for exam:", error);
@@ -224,7 +215,7 @@ export class ExameService {
         .populate({
           path: "createdBy",
           model: User,
-          select: "name email"
+          select: "name email",
         })
         .sort({ date: 1 });
 
@@ -235,7 +226,11 @@ export class ExameService {
     }
   }
 
-  static async updateExamResult(examId: string, athleteId: string, grade: string) {
+  static async updateExamResult(
+    examId: string,
+    athleteId: string,
+    grade: string
+  ) {
     try {
       const exam = await Exam.findById(examId);
       if (!exam) {
@@ -248,10 +243,11 @@ export class ExameService {
       }
 
       // Add exam result to athlete's record
+      athlete.examResults = athlete.examResults || [];
       athlete.examResults.push({
         examId: exam._id,
         grade,
-        date: exam.date
+        date: exam.date,
       });
 
       await athlete.save();
@@ -261,8 +257,8 @@ export class ExameService {
         result: {
           examName: exam.name,
           grade,
-          date: exam.date
-        }
+          date: exam.date,
+        },
       };
     } catch (error) {
       console.error("Error updating exam result:", error);
