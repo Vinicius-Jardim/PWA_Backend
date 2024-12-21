@@ -41,9 +41,6 @@ const monthlyFeeSchema = new mongoose.Schema(
         return this.status === status.PAID;
       },
     },
-    transactionId: {
-      type: String,
-    },
     notes: {
       type: String,
     },

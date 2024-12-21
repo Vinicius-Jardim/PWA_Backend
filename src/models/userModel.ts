@@ -33,10 +33,11 @@ export interface IUser extends Document {
   belt?: keyof typeof belts;
   age?: number;
   gender?: "male" | "female";
-  monthlyFee?: number;
+  monthlyFee?: Types.ObjectId;
   joinedDate?: Date;
   instructorId?: Types.ObjectId;
   athletes?: Types.ObjectId[];
+  monthlyPlan?: Types.ObjectId;
   examSchedule?: { date: Date; location: string }[];
   payments?: { date: Date; amount: number; status: "paid" | "pending" }[];
   examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
@@ -64,7 +65,8 @@ const UserSchema: Schema = new Schema(
     },
     age: { type: Number },
     gender: { type: String, enum: ["male", "female"] },
-    monthlyFee: { type: Number },
+    monthlyFee: { type: Schema.Types.ObjectId, ref: "MonthlyFee" },
+    monthlyPlan: { type: Schema.Types.ObjectId, ref: "MonthlyPlan" },
     joinedDate: { type: Date, default: Date.now },
     instructorId: {
       type: Schema.Types.ObjectId,

@@ -153,6 +153,10 @@ export class ExameService {
         return "Athlete does not have an instructor";
       }
 
+      if(!athlete.monthlyPlan){
+        return "Athlete does not have a monthly plan";
+      }
+
       // Check if athlete meets belt requirements
       const athleteBelt = athlete.belt;
       const allowedBelts = exam.beltLevel;
