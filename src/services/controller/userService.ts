@@ -1,5 +1,7 @@
 import { roles, belts } from "../../models/userModel";
 import User from "../../models/userModel";
+import path from 'path';
+import fs from 'fs';
 
 export class UserService {
   static async me(user: any) {
@@ -18,6 +20,7 @@ export class UserService {
           joinedDate: userData.joinedDate,
           monthlyFee: userData.monthlyFee,
           gender: userData.gender,
+          avatarUrl: userData.avatarUrl,
         };
         return data;
       }
@@ -27,6 +30,7 @@ export class UserService {
           email: userData.email,
           athletes: userData.athletes,
           examSchedule: userData.examSchedule,
+          avatarUrl: userData.avatarUrl,
         };
         return data;
       }
@@ -35,6 +39,7 @@ export class UserService {
           name: userData.name,
           email: userData.email,
           role: userData.role,
+          avatarUrl: userData.avatarUrl,
         };
         return data;
       }
@@ -125,6 +130,30 @@ export class UserService {
       };
     } catch (error) {
       console.error("Erro ao buscar atletas:", error);
+      throw error;
+    }
+  }
+
+  static async updateAvatar(userId: string, avatarUrl: string) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new Error("Usuário não encontrado");
+      }
+
+      // Remove old avatar file if exists
+      if (user.avatarUrl) {
+        const oldAvatarPath = path.join(__dirname, '../../../', user.avatarUrl);
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+
+      user.avatarUrl = avatarUrl;
+      await user.save();
+      return user;
+    } catch (error) {
+      console.error("Error updating avatar:", error);
       throw error;
     }
   }

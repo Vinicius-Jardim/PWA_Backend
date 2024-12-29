@@ -42,5 +42,25 @@ export const UserController = {
                 message: error instanceof Error ? error.message : "Erro ao buscar atletas"
             });
         }
+    },
+
+    uploadAvatar: async (req: Request, res: Response): Promise<void> => {
+        try {
+            if (!req.file) {
+                res.status(400).json({ message: "Nenhuma imagem foi enviada" });
+                return;
+            }
+
+            const userId = req.user.id;
+            const avatarUrl = `/uploads/${req.file.filename}`;
+
+            const result = await UserService.updateAvatar(userId, avatarUrl);
+            res.status(200).json({ avatarUrl });
+        } catch (error) {
+            console.error("Erro ao fazer upload do avatar:", error);
+            res.status(500).json({
+                message: error instanceof Error ? error.message : "Erro ao fazer upload do avatar"
+            });
+        }
     }
 };

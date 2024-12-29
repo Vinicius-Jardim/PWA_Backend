@@ -41,6 +41,7 @@ export interface IUser extends Document {
   payments?: { date: Date; amount: number; status: "paid" | "pending" }[];
   examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
   qrCode?: string;
+  avatarUrl?: string;
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -119,6 +120,7 @@ const UserSchema: Schema = new Schema(
         date: Date,
       },
     ],
+    avatarUrl: { type: String },
   },
   {
     timestamps: true,
