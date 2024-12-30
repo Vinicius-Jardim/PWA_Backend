@@ -28,8 +28,26 @@ export const MonthlyPlanController = {
 
   all: async (req: Request, res: Response) => {
     try {
-      const response = await MonthlyPlanService.all();
-      res.status(200).json(response);
+      const plans = await MonthlyPlan.find();
+      
+      // Se o usuário for instrutor, adiciona contagem de solicitações pendentes
+      if (req.user.role === 'INSTRUCTOR') {
+        const plansWithRequests = await Promise.all(plans.map(async (plan) => {
+          const pendingRequests = await MonthlyFee.countDocuments({
+            planId: plan._id,
+            status: 'pending'
+          });
+          
+          return {
+            ...plan.toObject(),
+            pendingRequests
+          };
+        }));
+        
+        return res.status(200).json(plansWithRequests);
+      }
+      
+      res.status(200).json(plans);
     } catch (error) {
       console.error("Erro ao buscar planos mensais:", error);
       res.status(400).json({
@@ -95,6 +113,80 @@ export const MonthlyPlanController = {
         message: 'Plano escolhido com sucesso',
         monthlyFee 
       });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  current: async (req: Request, res: Response) => {
+    try {
+      const userId = req.user.id;
+
+      // Busca a mensalidade mais recente do usuário
+      const currentFee = await MonthlyFee.findOne({
+        userId: userId,
+        status: { $in: ['pending', 'paid'] }
+      }).sort({ createdAt: -1 }).populate('planId');
+
+      if (!currentFee) {
+        return res.status(404).json({ message: 'Nenhum plano atual encontrado' });
+      }
+
+      const plan = currentFee.planId;
+      if (!plan) {
+        return res.status(404).json({ message: 'Plano não encontrado' });
+      }
+
+      res.json({
+        ...plan.toObject(),
+        status: currentFee.status === 'paid' ? 'ACCEPTED' : 'PENDING'
+      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  getPlanRequests: async (req: Request, res: Response) => {
+    try {
+      const { planId } = req.params;
+
+      // Verifica se o usuário é instrutor
+      if (req.user.role !== 'INSTRUCTOR') {
+        return res.status(403).json({ message: 'Acesso não autorizado' });
+      }
+
+      // Busca todas as solicitações pendentes para o plano
+      const requests = await MonthlyFee.find({
+        planId,
+        status: 'pending'
+      }).populate('userId', 'name email');
+
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  acceptPlanRequest: async (req: Request, res: Response) => {
+    try {
+      const { feeId } = req.params;
+
+      // Verifica se o usuário é instrutor
+      if (req.user.role !== 'INSTRUCTOR') {
+        return res.status(403).json({ message: 'Acesso não autorizado' });
+      }
+
+      const fee = await MonthlyFee.findById(feeId);
+      if (!fee) {
+        return res.status(404).json({ message: 'Solicitação não encontrada' });
+      }
+
+      // Atualiza o status da mensalidade para pago
+      fee.status = 'paid';
+      fee.paidAt = new Date();
+      await fee.save();
+
+      res.json({ message: 'Solicitação aceita com sucesso' });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
