@@ -11,7 +11,7 @@ interface JwtPayloadCustom extends JwtPayload {
 
 // Middleware para verificar roles com base na hierarquia
 export const authorizeRole =
-  (requiredRole: keyof typeof roles) =>
+  (requiredRoles: (keyof typeof roles) | (keyof typeof roles)[]) =>
   (req: Request, res: Response, next: NextFunction): void => {
     const authHeader = req.headers.authorization;
 
@@ -33,8 +33,13 @@ export const authorizeRole =
       // Obter o papel do usuário do payload
       const userRole = decoded.role;
 
-      // Verificar se o papel do usuário cumpre a hierarquia necessária
-      if (roleHierarchy[userRole] < roleHierarchy[requiredRole]) {
+      // Converter requiredRoles para array se for uma string
+      const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+
+      // Verificar se o papel do usuário cumpre a hierarquia necessária para pelo menos um dos papéis requeridos
+      const hasRequiredRole = roles.some(role => roleHierarchy[userRole] >= roleHierarchy[role]);
+
+      if (!hasRequiredRole) {
         res.status(403).json({ message: 'Access Denied: Insufficient Role' });
         return;
       }

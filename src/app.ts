@@ -4,6 +4,7 @@ import { router } from './api/router';
 import { db } from './utils/dbConection';
 import cors from 'cors';
 import path from 'path';
+import athleteRoutes from './api/routes/athletes'; // Corrigindo o caminho
 
 const PORT = config.port;
 const app = express();
@@ -24,5 +25,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 for (const route of router) {
   app.use(route.path, route.router);
 }
+
+// Nova rota para atletas
+app.use('/api/athletes', athleteRoutes);
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));

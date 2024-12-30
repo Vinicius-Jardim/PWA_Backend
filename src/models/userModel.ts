@@ -42,6 +42,7 @@ export interface IUser extends Document {
   examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
   qrCode?: string;
   avatarUrl?: string;
+  suspended?: boolean;
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -67,6 +68,7 @@ const UserSchema: Schema = new Schema(
     gender: { type: String, enum: ["male", "female"] },
     monthlyFee: { type: Number },
     joinedDate: { type: Date, default: Date.now },
+    suspended: { type: Boolean, default: false },
     instructorId: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -102,24 +104,25 @@ const UserSchema: Schema = new Schema(
     },
     examSchedule: [
       {
-        date: Date,
-        location: String,
+        date: { type: Date },
+        location: { type: String },
       },
     ],
     payments: [
       {
-        date: Date,
-        amount: Number,
+        date: { type: Date },
+        amount: { type: Number },
         status: { type: String, enum: ["paid", "pending"] },
       },
     ],
     examResults: [
       {
         examId: { type: Schema.Types.ObjectId, ref: "Exam" },
-        grade: String,
-        date: Date,
+        grade: { type: String },
+        date: { type: Date },
       },
     ],
+    qrCode: { type: String },
     avatarUrl: { type: String },
   },
   {
@@ -131,40 +134,32 @@ const UserSchema: Schema = new Schema(
 UserSchema.methods.hasPermission = function (
   this: IUser,
   requiredRole: keyof typeof roles
-) {
-  return roleHierarchy[this.role] >= roleHierarchy[requiredRole];
+): boolean {
+  const userRoleLevel = roleHierarchy[this.role];
+  const requiredRoleLevel = roleHierarchy[requiredRole];
+  return userRoleLevel >= requiredRoleLevel;
 };
 
 // Middleware para limpar campos específicos
 UserSchema.pre("save", function (next) {
   const user = this as IUser;
 
-  // Limpar atributos específicos com base no papel do usuário
-  if (user.role === roles.ATHLETE) {
-    // Garantir que atributos de atleta estejam presentes
-    user.athletes = undefined;
-  } else {
-    // Limpar campos exclusivos de ATHLETE para outros papéis
-    user.examSchedule = undefined;
-    user.payments = undefined;
-    user.examResults = undefined;
+  // Se não for atleta, remove campos específicos de atleta
+  if (user.role !== roles.ATHLETE) {
+    user.belt = undefined;
+    user.instructorId = undefined;
+    user.monthlyFee = undefined;
   }
 
-  if (user.role === roles.INSTRUCTOR) {
-    // Remover instructorId se o papel for INSTRUCTOR
-    user.instructorId = undefined;
-  }
-
-  // Garantir que outros papéis não possuam campos extras
-  if (user.role !== roles.INSTRUCTOR && user.role !== roles.ATHLETE) {
-    user.athletes = undefined;
-    user.instructorId = undefined;
+  // Se não for instrutor, remove lista de atletas
+  if (user.role !== roles.INSTRUCTOR) {
+    user.athletes = [];
   }
 
   next();
 });
 
-const User = mongoose.model<IUser>("User", UserSchema);
-export default User;
 export type RoleType = keyof typeof roles;
 export type BeltType = keyof typeof belts;
+
+export default mongoose.model<IUser>("User", UserSchema);
