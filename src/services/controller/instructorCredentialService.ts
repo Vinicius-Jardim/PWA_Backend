@@ -1,110 +1,142 @@
-import Credential from "../../models/instructorCredential";
-import User, { roles } from "../../models/userModel";
+import InstructorCredential from "../../models/instructorCredential";
+import User from "../../models/userModel";
+import { roles } from "../../models/userModel";
 
 export class InstructorCredentialService {
-  static async createInstructorCredential(id: string) {
+  static async createInstructorCredential(userId: string) {
     try {
-      if (!id) {
-        return { message: "Instructor ID is required" };
+      // Verificar se o usuário existe e é um instrutor
+      const instructor = await User.findById(userId);
+      if (!instructor) {
+        throw new Error("Usuário não encontrado");
       }
-      const existingCredential = await Credential.findOne({
-        instructorId: id,
-      });
+      if (instructor.role !== roles.INSTRUCTOR) {
+        throw new Error("O usuário precisa ser um instrutor");
+      }
+
+      // Verificar se já existe uma credencial para este instrutor
+      const existingCredential = await InstructorCredential.findOne({ user: userId });
       if (existingCredential) {
-        return { message: "Instructor credential already exists" };
+        throw new Error("Este instrutor já possui uma credencial");
       }
-      const newCredential = new Credential({ instructorId: id });
-      await newCredential.save();
-      return "Instructor credential created successfully";
-    } catch (error) {
-      console.error("Error creating instructor credential:", error, {
-        stack: error,
+
+      // Gerar ID único de 9 dígitos
+      const instructorId = Math.floor(100000000 + Math.random() * 900000000).toString();
+
+      // Criar nova credencial
+      const credential = new InstructorCredential({
+        instructorId,
+        user: userId,
+        isUsed: false
       });
-      return { message: "An unexpected error occurred" };
+
+      await credential.save();
+      return credential;
+    } catch (error) {
+      throw error;
     }
   }
 
-  static async getAll(
-    filters: { role?: string; search?: string; isUsed: boolean } = {
-      isUsed: false,
-    },
-    page: number = 1,
-    pageSize: number = 10
-  ) {
+  static async getAll(filters: any, page: number, pageSize: number) {
     try {
-
-      // Filtro de pesquisa (se houver)
-      const searchQuery = filters.search
-        ? {
-            $or: [{ instructorId: { $regex: filters.search, $options: "i" } }],
-          }
-        : {};
-
-      const isUsedFilter = { isUsed: filters.isUsed };
-
-      const query = { ...searchQuery, ...isUsedFilter };
+      const query: any = {};
       
-      const totalCount = await Credential.countDocuments(query);
+      // Aplicar filtros
+      if (filters.search) {
+        query.instructorId = new RegExp(filters.search, 'i');
+      }
+      if (typeof filters.isUsed === 'boolean') {
+        query.isUsed = filters.isUsed;
+      }
 
-      const credentials = await Credential.find(query)
-        .skip((page - 1) * pageSize) // Offset
-        .limit(pageSize) // Tamanho da página
-        .exec();
+      // Calcular skip para paginação
+      const skip = (page - 1) * pageSize;
+
+      // Buscar credenciais com populate do usuário
+      const credentials = await InstructorCredential.find(query)
+        .populate('user', 'name email')
+        .skip(skip)
+        .limit(pageSize)
+        .sort({ createdAt: -1 });
+
+      // Contar total para paginação
+      const total = await InstructorCredential.countDocuments(query);
 
       return {
-        totalCount,
         credentials,
-        totalPages: Math.ceil(totalCount / pageSize),
-        currentPage: page,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
       };
     } catch (error) {
-      console.error("Error fetching instructor credentials:", error);
-      throw new Error(error instanceof Error ? error.message : String(error));
+      throw error;
     }
   }
 
-  static async getById(id: string, role: string, userId: string) {
+  static async getById(id: string, roleUser: string, userId: string) {
     try {
-      if (role !== "ADMIN") {
-        const credential = await Credential.findById(id);
-        if (!credential) {
-          throw new Error("Instructor credential not found");
-        }
-        return credential;
-      } else {
-        const user = await User.findById(userId);
-        if (!user) {
-          throw new Error("User not found");
-        }
-        const credential = await Credential.findById(user.instructorId);
-        return credential;
+      const credential = await InstructorCredential.findById(id).populate('user', 'name email');
+      
+      if (!credential) {
+        throw new Error("Credencial não encontrada");
       }
+
+      // Se não for admin, só pode ver sua própria credencial
+      if (roleUser !== roles.ADMIN && credential.user?.toString() !== userId) {
+        throw new Error("Não autorizado a ver esta credencial");
+      }
+
+      return credential;
     } catch (error) {
-      console.error("Error fetching instructor credential by ID:", error);
-      throw new Error(error instanceof Error ? error.message : String(error));
+      throw error;
     }
   }
 
   static async deleteById(id: string) {
     try {
-      const deletedCredential = await Credential.findByIdAndDelete(id);
-      if (!deletedCredential) {
-        throw new Error("Instructor credential not found");
-      }
-      if (deletedCredential.isUsed === true) {
-        const user = await User.findOne({ instructorId: id });
-        if (user) {
-          user.instructorId = undefined;
-          user.role = roles.ATHLETE;
-          await user.save();
-        }
-        return "Instructor credential deleted successfully and user role updated";
+      const credential = await InstructorCredential.findById(id);
+      
+      if (!credential) {
+        throw new Error("Credencial não encontrada");
       }
 
-      return "Instructor credential deleted successfully";
+      if (credential.isUsed) {
+        throw new Error("Não é possível deletar uma credencial já utilizada");
+      }
+
+      await credential.deleteOne();
+      return { message: "Credencial deletada com sucesso" };
     } catch (error) {
-      console.error("Error deleting instructor credential by ID:", error);
-      throw new Error(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  static async validateCredential(instructorId: string) {
+    try {
+      // Buscar a credencial
+      const credential = await InstructorCredential.findOne({ 
+        instructorId,
+        isUsed: false 
+      }).populate('user');
+
+      if (!credential) {
+        throw new Error("Credencial inválida ou já utilizada");
+      }
+
+      // Verificar se o instrutor já atingiu o limite de 10 alunos
+      const athleteCount = await User.countDocuments({ 
+        instructorId: credential.user?._id,
+        role: roles.ATHLETE 
+      });
+
+      if (athleteCount >= 10) {
+        throw new Error("Este instrutor já atingiu o limite máximo de 10 alunos");
+      }
+
+      return credential;
+    } catch (error) {
+      throw error;
     }
   }
 }

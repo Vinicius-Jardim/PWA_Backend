@@ -18,87 +18,152 @@ const setAuthCookie = (res: Response, token: string) => {
 };
 
 export class AuthService {
+  // Registro normal para atletas
   static async register(
     name: string,
     email: string,
     password: string,
-    instructorId: string | null,
-    confirmPassword: string
+    confirmPassword: string,
+    instructorId?: string
   ) {
     try {
       // Verificar campos obrigatórios
       if (!name || !email || !password) {
-        return { message: "Name, email, and password are required" };
+        throw new Error("Name, email, and password are required");
       }
 
       // Verificar se o usuário já existe
       const existingUser = await User.findOne({ email });
       if (existingUser) {
-        return { message: "User already exists" };
+        throw new Error("User already exists");
       }
 
       // Verificar se as senhas coincidem
       if (password !== confirmPassword) {
-        return { message: "Passwords do not match" };
+        throw new Error("Passwords do not match");
+      }
+
+      // Se fornecido instructorId, validar e obter o instrutor
+      let instructor;
+      if (instructorId) {
+        instructor = await User.findById(instructorId);
+        if (!instructor || instructor.role !== roles.INSTRUCTOR) {
+          throw new Error("Instructor not found");
+        }
+
+        // Verificar se o instrutor já atingiu o limite de 10 alunos
+        const athleteCount = await User.countDocuments({ instructorId: instructor._id });
+        if (athleteCount >= 10) {
+          throw new Error("This instructor has reached the maximum number of students");
+        }
       }
 
       // Criar o hash da senha
       const hashPassword = await createPassword(password);
 
-      // Inicializar os dados básicos do novo usuário
-      let newUserData: Partial<IUser> = {
+      // Criar o usuário como ATHLETE
+      const newUser = new User({
         name,
         email,
         password: hashPassword,
-        role: roles.ATHLETE, // Valor padrão: "ATHLETE"
-      };
+        role: roles.ATHLETE,
+        instructorId: instructor?._id,
+      });
 
-      // Caso o `instructorId` seja fornecido, configurar como "INSTRUCTOR"
-      if (instructorId) {
-        const validateCredential = await Credential.findOne({
-          instructorId,
-          isUsed: false,
-        });
-
-        if (!validateCredential) {
-          return {
-            message: "Invalid instructor ID or credential already used",
-          };
-        }
-
-        // Atualizar credencial como usada
-        validateCredential.isUsed = true;
-        validateCredential.updatedAt = new Date();
-        await validateCredential.save();
-
-        // Atualizar papel para "INSTRUCTOR" e adicionar credenciais
-        newUserData = {
-          ...newUserData,
-          role: roles.INSTRUCTOR,
-        };
-
-        // Criar o usuário como "INSTRUCTOR"
-        const newUser = new User(newUserData);
-        await newUser.save();
-
-        validateCredential.user = newUser._id;
-        await validateCredential.save();
-
-        // Criar o token JWT para o instrutor
-        const token = createToken(newUser);
-        return token;
-      }
-
-      // Criar o usuário como "ATHLETE" sem atributos irrelevantes
-      const newUser = new User(newUserData);
       await newUser.save();
 
-      // Criar o token JWT para o atleta
+      // Criar o token JWT
       const token = createToken(newUser);
-      return token;
+      return { 
+        token, 
+        user: { 
+          id: newUser._id, 
+          name: newUser.name, 
+          email: newUser.email, 
+          role: newUser.role,
+          instructorId: newUser.instructorId 
+        } 
+      };
     } catch (error) {
-      console.error("Error during registration:", error, { stack: error });
-      return { message: "An unexpected error occurred" };
+      throw error;
+    }
+  }
+
+  // Registro específico para instrutores (apenas admin)
+  static async registerInstructor(
+    name: string,
+    email: string,
+    password: string,
+    confirmPassword: string,
+    instructorId: string
+  ) {
+    try {
+      // Verificar campos obrigatórios
+      if (!name || !email || !password || !instructorId) {
+        throw new Error("Name, email, password and instructorId are required");
+      }
+
+      // Validar formato do instructorId (9 dígitos)
+      if (!/^\d{9}$/.test(instructorId)) {
+        throw new Error("Instructor ID must be 9 digits");
+      }
+
+      // Verificar se o usuário já existe
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        throw new Error("User already exists");
+      }
+
+      // Verificar se já existe uma credencial com este ID
+      const existingCredential = await Credential.findOne({ instructorId });
+      if (existingCredential) {
+        throw new Error("Instructor ID already exists");
+      }
+
+      // Verificar se as senhas coincidem
+      if (password !== confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      // Criar o hash da senha
+      const hashPassword = await createPassword(password);
+
+      // Criar o usuário como INSTRUCTOR
+      const newUser = new User({
+        name,
+        email,
+        password: hashPassword,
+        role: roles.INSTRUCTOR,
+      });
+
+      await newUser.save();
+
+      // Criar a credencial do instrutor
+      const credential = new Credential({
+        instructorId,
+        user: newUser._id,
+        isUsed: false
+      });
+
+      await credential.save();
+
+      // Criar o token JWT
+      const token = createToken(newUser);
+      return { 
+        token, 
+        user: { 
+          id: newUser._id, 
+          name: newUser.name, 
+          email: newUser.email, 
+          role: newUser.role 
+        },
+        credential: {
+          id: credential._id,
+          instructorId: credential.instructorId
+        }
+      };
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -136,6 +201,7 @@ export class AuthService {
       return { message: "An unexpected error occurred" };
     }
   }
+
   static async loginWithQR(qrCode: string, res: Response) {
     try {
       if (!qrCode) {

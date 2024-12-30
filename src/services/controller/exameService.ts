@@ -206,11 +206,23 @@ export class ExameService {
         .populate({
           path: "createdBy",
           model: User,
-          select: "name email",
+          select: "name email profilePicture",
         })
         .sort({ date: 1 });
 
-      return exams;
+      // Mapeia os exames para incluir informações formatadas do instrutor
+      const formattedExams = exams.map((exam) => ({
+        ...exam.toObject(),
+        instructor: exam.createdBy
+          ? {
+              name: exam.createdBy.name,
+              email: exam.createdBy.email,
+              profilePicture: exam.createdBy.profilePicture,
+            }
+          : null,
+      }));
+
+      return formattedExams;
     } catch (error) {
       console.error("Error fetching athlete exams:", error);
       throw new Error("Failed to fetch athlete exams");

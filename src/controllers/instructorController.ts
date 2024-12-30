@@ -2,15 +2,15 @@ import { Request, Response } from "express";
 import { InstructorService } from "../services/controller/instructorService";
 
 export const InstructorController = {
+  // Rota protegida - retorna dados completos
   all: async (req: Request, res: Response): Promise<void> => {
     try {
-      // Extrair dados de consulta
       const filters = {
-        search: (req.query.search as string) || "", // Termo de busca
-        isUsed: req.query.isUsed === "true", // Filtro booleano
+        search: (req.query.search as string) || "",
+        isUsed: req.query.isUsed === "true",
       };
-      const page = parseInt(req.query.page as string, 10) || 1; // Página
-      const pageSize = parseInt(req.query.pageSize as string, 10) || 10; // Tamanho da página
+      const page = parseInt(req.query.page as string, 10) || 1;
+      const pageSize = parseInt(req.query.pageSize as string, 10) || 10;
 
       const result = await InstructorService.all(filters, page, pageSize);
       res.status(200).json(result);
@@ -18,6 +18,20 @@ export const InstructorController = {
       console.error("Error in getAll controller:", error);
       res.status(500).json({
         message: "Error fetching instructor credentials",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+
+  // Nova rota pública - retorna apenas dados básicos
+  getPublicList: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await InstructorService.getPublicList();
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Error in getPublicList controller:", error);
+      res.status(500).json({
+        message: "Error fetching instructors list",
         error: error instanceof Error ? error.message : String(error),
       });
     }

@@ -1,29 +1,36 @@
-import mongoose, { Schema, Document, Types } from "mongoose";
+import mongoose, { Schema, Document } from 'mongoose';
 
-// Definindo a interface do InstructorID (documento Mongoose)
-interface ICredential extends Document {
-  instructorId: string; // ID único do instrutor
-  user: Types.ObjectId;
-  createdAt: Date; // Data de criação
-  updatedAt: Date; // Data da última atualização
-  active: boolean; // Se o instrutor está ativo ou não
-  isUsed: boolean; // Se o instructorId já está sendo usado
+export interface IInstructorCredential extends Document {
+  instructorId: string;  // ID único do instrutor (tipo documento de identificação)
+  isUsed: boolean;      // Se já foi usado para registro
+  user?: Schema.Types.ObjectId;  // Referência ao usuário instrutor
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Definindo o schema do InstructorID
-const CredentialSchema: Schema = new Schema(
-  {
-    instructorId: { type: String, required: true, unique: true }, // ID único do instrutor
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Referência ao usuário
-    active: { type: Boolean, default: true }, // Status do instrutor (ativo ou não)
-    isUsed: { type: Boolean, default: false }, // Indica se o instructorId já está sendo usado
+const instructorCredentialSchema = new Schema<IInstructorCredential>({
+  instructorId: {
+    type: String,
+    required: true,
+    unique: true,
+    validate: {
+      validator: function(v: string) {
+        // Validação para número de identificação português
+        return /^\d{9}$/.test(v);  // 9 dígitos
+      },
+      message: props => `${props.value} não é um número de identificação válido!`
+    }
   },
-  {
-    timestamps: true, // Adiciona createdAt e updatedAt automaticamente
+  isUsed: {
+    type: Boolean,
+    default: false
+  },
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   }
-);
+}, {
+  timestamps: true
+});
 
-// Criando o modelo InstructorID
-const Credential = mongoose.model<ICredential>("Credential", CredentialSchema);
-
-export default Credential;
+export default mongoose.model<IInstructorCredential>('InstructorCredential', instructorCredentialSchema);

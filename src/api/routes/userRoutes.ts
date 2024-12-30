@@ -10,6 +10,7 @@ const router = express.Router();
 
 // Rotas de autenticação
 router.post("/register", AuthController.register);
+router.post("/register-instructor", verifyToken, authorizeRole(roles.ADMIN), AuthController.registerInstructor);
 router.post("/login", AuthController.login);
 router.post("/login-qr", AuthController.loginWithQR);
 
