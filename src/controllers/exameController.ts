@@ -9,26 +9,31 @@ export const ExameController = {
 
       if (!name || !date || !beltLevel || !maxParticipants) {
         return res.status(400).json({
-          message: "Missing required fields: name, date, and beltLevel",
+          message: "Campos obrigatórios faltando: nome, data e nível da faixa",
         });
       }
 
       // Passar os dados validados ao serviço
       const result = await ExameService.create(req.body, req.user);
 
-      return res.status(201).json({ message: "Exam created", exam: result });
+      return res.status(201).json({ message: "Exame criado com sucesso", exam: result });
     } catch (error) {
-      console.error("Error during exam creation:", error);
+      console.error("Erro durante a criação do exame:", error);
 
-      // Adicionar uma resposta mais específica caso o erro seja de validação
-      if (
-        error instanceof Error &&
-        error.message.includes("validation failed")
-      ) {
-        return res.status(400).json({ message: "Invalid exam data provided" });
+      // Handle specific error cases
+      if (error instanceof Error) {
+        if (error.message.includes("Faixas inválidas")) {
+          return res.status(400).json({ 
+            message: "Faixas inválidas fornecidas",
+            details: error.message
+          });
+        }
+        if (error.message.includes("validation failed")) {
+          return res.status(400).json({ message: "Dados do exame inválidos" });
+        }
       }
 
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ message: "Erro interno do servidor" });
     }
   },
 
@@ -67,8 +72,8 @@ export const ExameController = {
     } catch (error) {
       console.error("Error in getAllExams controller:", error);
       res.status(500).json({
-        message: "Failed to fetch exams",
-        error: error instanceof Error ? error.message : "Unknown error",
+        message: "Falha ao buscar exames",
+        error: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
   },
@@ -81,12 +86,30 @@ export const ExameController = {
       const response = await ExameService.registerForExam(examId, athleteId);
       res.status(200).json(response);
     } catch (error) {
-      console.error("Error in exam registration:", error);
+      console.error("Erro ao registrar no exame:", error);
       res.status(400).json({
         message:
           error instanceof Error
             ? error.message
-            : "Failed to register for exam",
+            : "Falha ao registrar no exame",
+      });
+    }
+  },
+
+  unregister: async (req: Request, res: Response) => {
+    try {
+      const examId = req.params.id;
+      const athleteId = req.user.id;
+
+      const response = await ExameService.unregisterFromExam(examId, athleteId);
+      res.status(200).json(response);
+    } catch (error) {
+      console.error("Erro ao cancelar inscrição no exame:", error);
+      res.status(400).json({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Falha ao cancelar inscrição no exame",
       });
     }
   },
@@ -97,9 +120,9 @@ export const ExameController = {
       const exams = await ExameService.getAthleteExams(athleteId);
       res.status(200).json(exams);
     } catch (error) {
-      console.error("Error fetching athlete exams:", error);
+      console.error("Erro ao buscar exames do atleta:", error);
       res.status(500).json({
-        message: "Failed to fetch exams",
+        message: "Falha ao buscar exames",
       });
     }
   },
@@ -110,7 +133,7 @@ export const ExameController = {
 
       if (!examId || !athleteId || !grade) {
         return res.status(400).json({
-          message: "Missing required fields: examId, athleteId, and grade",
+          message: "Campos obrigatórios faltando: examId, athleteId e nota",
         });
       }
 
@@ -121,12 +144,12 @@ export const ExameController = {
       );
       res.status(200).json(result);
     } catch (error) {
-      console.error("Error updating exam result:", error);
+      console.error("Erro ao atualizar resultado do exame:", error);
       res.status(400).json({
         message:
           error instanceof Error
             ? error.message
-            : "Failed to update exam result",
+            : "Falha ao atualizar resultado do exame",
       });
     }
   },

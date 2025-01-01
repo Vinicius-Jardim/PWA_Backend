@@ -30,6 +30,12 @@ router.post(
   authorizeRole(roles.ATHLETE),
   ExameController.register
 );
+router.post(
+  "/unregister/:id",
+  verifyToken,
+  authorizeRole(roles.ATHLETE),
+  ExameController.unregister
+);
 router.get(
   "/my-exams",
   verifyToken,

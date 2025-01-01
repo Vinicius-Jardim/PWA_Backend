@@ -9,6 +9,7 @@ export interface IExam extends Document {
   participants: mongoose.Types.ObjectId[]; // IDs dos atletas inscritos
   beltLevel: string[]; // Graduação necessária para inscrição
   createdBy: mongoose.Types.ObjectId; // ID do instrutor que criou o exame
+  instructor: mongoose.Types.ObjectId; // ID do instrutor responsável pelo exame
 }
 
 // Schema do Exam
@@ -28,6 +29,11 @@ const ExamSchema: Schema = new Schema<IExam>(
       ref: "User",
       required: true,
     }, // Criador
+    instructor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    }, // Instrutor responsável
   },
   {
     timestamps: true, // Adiciona campos de createdAt e updatedAt automaticamente
