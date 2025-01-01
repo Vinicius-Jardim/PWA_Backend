@@ -8,19 +8,18 @@ import { upload } from "../../middlewares/uploadMiddleware";
 
 const router = express.Router();
 
-// Rotas de autenticação
+// Authentication routes
 router.post("/register", AuthController.register);
-router.post("/register-instructor", verifyToken, authorizeRole(roles.ADMIN), AuthController.registerInstructor);
 router.post("/login", AuthController.login);
 router.post("/login-qr", AuthController.loginWithQR);
 
-// Rota para obter dados do usuário logado
+// User data route
 router.get("/me", verifyToken, UserController.me);
 
-// Rota para upload de avatar
+// Avatar upload route
 router.post("/avatar", verifyToken, upload.single('avatar'), UserController.uploadAvatar);
 
-// Rotas para gerenciamento de atletas (apenas para instrutores)
+// Athlete management routes (instructors only)
 router.get("/athletes", verifyToken, authorizeRole(roles.INSTRUCTOR), UserController.getAthletes);
 router.put("/athletes/:athleteId/belt", verifyToken, authorizeRole(roles.INSTRUCTOR), UserController.updateAthleteBelt);
 

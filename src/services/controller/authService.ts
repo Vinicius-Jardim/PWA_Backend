@@ -1,5 +1,4 @@
 import User, { IUser } from "../../models/userModel";
-import Credential from "../../models/instructorCredential";
 import { comparePassword, createPassword } from "../../utils/passwordUtil";
 import { roles, RoleType } from "../../models/userModel";
 import { createToken } from "../../utils/tokenUtil";
@@ -8,17 +7,17 @@ import { Response } from "express";
 import { Schema } from "mongoose";
 import { config } from "../../config";
 
-// Função para definir o cookie de autenticação
+// Function to set authentication cookie
 const setAuthCookie = (res: Response, token: string) => {
   res.cookie("token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 24 * 60 * 60 * 1000, // 1 dia
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
   });
 };
 
 export class AuthService {
-  // Registro normal para atletas
+  // Register for athletes
   static async register(
     name: string,
     email: string,
@@ -27,23 +26,23 @@ export class AuthService {
     instructorId?: string
   ) {
     try {
-      // Verificar campos obrigatórios
+      // Check required fields
       if (!name || !email || !password) {
         throw new Error("Name, email, and password are required");
       }
 
-      // Verificar se o usuário já existe
+      // Check if user already exists
       const existingUser = await User.findOne({ email });
       if (existingUser) {
         throw new Error("User already exists");
       }
 
-      // Verificar se as senhas coincidem
+      // Check if passwords match
       if (password !== confirmPassword) {
         throw new Error("Passwords do not match");
       }
 
-      // Se fornecido instructorId, validar e obter o instrutor
+      // If instructorId provided, validate and get instructor
       let instructor;
       if (instructorId) {
         instructor = await User.findById(instructorId);
@@ -51,17 +50,17 @@ export class AuthService {
           throw new Error("Instructor not found");
         }
 
-        // Verificar se o instrutor já atingiu o limite de 10 alunos
+        // Check if instructor has reached max students (10)
         const athleteCount = await User.countDocuments({ instructorId: instructor._id });
         if (athleteCount >= 10) {
           throw new Error("This instructor has reached the maximum number of students");
         }
       }
 
-      // Criar o hash da senha
+      // Create password hash
       const hashPassword = await createPassword(password);
 
-      // Criar o usuário como ATHLETE
+      // Create user as ATHLETE
       const newUser = new User({
         name,
         email,
@@ -72,7 +71,7 @@ export class AuthService {
 
       await newUser.save();
 
-      // Criar o token JWT
+      // Create JWT token
       const token = createToken(newUser);
       return { 
         token, 
@@ -83,84 +82,6 @@ export class AuthService {
           role: newUser.role,
           instructorId: newUser.instructorId 
         } 
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Registro específico para instrutores (apenas admin)
-  static async registerInstructor(
-    name: string,
-    email: string,
-    password: string,
-    confirmPassword: string,
-    instructorId: string
-  ) {
-    try {
-      // Verificar campos obrigatórios
-      if (!name || !email || !password || !instructorId) {
-        throw new Error("Name, email, password and instructorId are required");
-      }
-
-      // Validar formato do instructorId (9 dígitos)
-      if (!/^\d{9}$/.test(instructorId)) {
-        throw new Error("Instructor ID must be 9 digits");
-      }
-
-      // Verificar se o usuário já existe
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        throw new Error("User already exists");
-      }
-
-      // Verificar se já existe uma credencial com este ID
-      const existingCredential = await Credential.findOne({ instructorId });
-      if (existingCredential) {
-        throw new Error("Instructor ID already exists");
-      }
-
-      // Verificar se as senhas coincidem
-      if (password !== confirmPassword) {
-        throw new Error("Passwords do not match");
-      }
-
-      // Criar o hash da senha
-      const hashPassword = await createPassword(password);
-
-      // Criar o usuário como INSTRUCTOR
-      const newUser = new User({
-        name,
-        email,
-        password: hashPassword,
-        role: roles.INSTRUCTOR,
-      });
-
-      await newUser.save();
-
-      // Criar a credencial do instrutor
-      const credential = new Credential({
-        instructorId,
-        user: newUser._id,
-        isUsed: false
-      });
-
-      await credential.save();
-
-      // Criar o token JWT
-      const token = createToken(newUser);
-      return { 
-        token, 
-        user: { 
-          id: newUser._id, 
-          name: newUser.name, 
-          email: newUser.email, 
-          role: newUser.role 
-        },
-        credential: {
-          id: credential._id,
-          instructorId: credential.instructorId
-        }
       };
     } catch (error) {
       throw error;
@@ -208,7 +129,7 @@ export class AuthService {
         throw new Error("QR code is required");
       }
 
-      // Decodificar o QR code
+      // Decode QR code
       let qrData;
       try {
         qrData = JSON.parse(qrCode);
@@ -220,7 +141,7 @@ export class AuthService {
         throw new Error("QR code missing token");
       }
 
-      // Extrair ID do token
+      // Extract ID from token
       const decodedToken = jwt.verify(
         qrData.token,
         process.env.SECRET_KEY || "supersecretkey"
@@ -231,21 +152,21 @@ export class AuthService {
         throw new Error("Token missing user ID");
       }
 
-      // Procurar usuário pelo ID do token
+      // Find user by token ID
       const user = await User.findById(userId);
 
       if (!user) {
         throw new Error("User not found");
       }
 
-      // Atualizar o QR code do usuário
+      // Update user's QR code
       user.qrCode = qrCode;
       await user.save();
 
-      // Criar token JWT
+      // Create JWT token
       const token = createToken(user);
 
-      // Definir cookie de autenticação
+      // Set authentication cookie
       setAuthCookie(res, token.token);
 
       return {

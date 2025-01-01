@@ -43,6 +43,7 @@ export interface IUser extends Document {
   qrCode?: string;
   avatarUrl?: string;
   suspended?: boolean;
+  credentialNumber?: string;
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -56,6 +57,18 @@ const UserSchema: Schema = new Schema(
       type: String,
       required: true,
       enum: Object.values(roles),
+    },
+    credentialNumber: {
+      type: String,
+      validate: {
+        validator: function (v: string) {
+          return this.role !== roles.INSTRUCTOR || (v && v.length === 9 && /^\d+$/.test(v));
+        },
+        message: "Número de credencial deve ter exatamente 9 dígitos",
+      },
+      required: function (this: { role: string }) {
+        return this.role === roles.INSTRUCTOR;
+      },
     },
     belt: {
       type: String,

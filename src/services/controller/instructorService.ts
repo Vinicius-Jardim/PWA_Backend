@@ -84,4 +84,83 @@ export class InstructorService {
       throw error;
     }
   }
+
+  // Criar novo instrutor com credencial
+  static async createInstructor(instructorData: {
+    name: string;
+    email: string;
+    password: string;
+    credentialNumber: string;
+  }) {
+    try {
+      // Verificar se o número de credencial já existe
+      const existingInstructor = await User.findOne({
+        credentialNumber: instructorData.credentialNumber,
+        role: roles.INSTRUCTOR
+      });
+
+      if (existingInstructor) {
+        throw new Error("Este número de credencial já está em uso");
+      }
+
+      // Criar novo instrutor
+      const instructor = new User({
+        ...instructorData,
+        role: roles.INSTRUCTOR
+      });
+
+      await instructor.save();
+      return instructor;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Atualizar credencial do instrutor
+  static async updateCredential(instructorId: string, newCredentialNumber: string) {
+    try {
+      // Verificar se o novo número já está em uso
+      const existingInstructor = await User.findOne({
+        credentialNumber: newCredentialNumber,
+        role: roles.INSTRUCTOR,
+        _id: { $ne: instructorId }
+      });
+
+      if (existingInstructor) {
+        throw new Error("Este número de credencial já está em uso");
+      }
+
+      const instructor = await User.findOneAndUpdate(
+        { _id: instructorId, role: roles.INSTRUCTOR },
+        { credentialNumber: newCredentialNumber },
+        { new: true }
+      );
+
+      if (!instructor) {
+        throw new Error("Instrutor não encontrado");
+      }
+
+      return instructor;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Deletar instrutor
+  static async deleteInstructor(instructorId: string) {
+    try {
+      const instructor = await User.findOneAndDelete({
+        _id: instructorId,
+        role: roles.INSTRUCTOR
+      });
+
+      if (!instructor) {
+        throw new Error("Instrutor não encontrado");
+      }
+
+      return instructor;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
