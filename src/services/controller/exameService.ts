@@ -189,6 +189,16 @@ export class ExameService {
 
   static async registerForExam(examId: string, athleteId: string) {
     try {
+      // Verificar se o atleta está suspenso
+      const athlete = await User.findById(athleteId);
+      if (!athlete) {
+        throw new Error("Atleta não encontrado");
+      }
+
+      if (athlete.suspended) {
+        throw new Error("O seu plano está como pendente para pagamento, entre em contacto com o seu instrutor.");
+      }
+
       // Buscar o exame e popular o instrutor e criador
       const exam = await Exam.findById(examId)
         .populate('instructor', 'name email')
