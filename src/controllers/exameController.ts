@@ -1,16 +1,15 @@
 import { Request, Response } from "express";
 import { ExameService } from "../services/controller/exameService";
+import { Exam } from "../models/examModel"; // Import the Exam model
 
 export const ExameController = {
   create: async (req: Request, res: Response) => {
     try {
       // Validar os campos necessários
-      const { name, date, beltLevel, maxParticipants } = req.body;
+      const { name, date, beltLevel, maxParticipants, description } = req.body;
 
-      if (!name || !date || !beltLevel || !maxParticipants) {
-        return res.status(400).json({
-          message: "Campos obrigatórios faltando: nome, data e nível da faixa",
-        });
+      if (!name || !date || !beltLevel) {
+        return res.status(400).json({ message: "Campos obrigatórios faltando" });
       }
 
       // Passar os dados validados ao serviço
@@ -129,7 +128,7 @@ export const ExameController = {
 
   updateResult: async (req: Request, res: Response) => {
     try {
-      const { examId, athleteId, grade } = req.body;
+      const { examId, athleteId, grade, observations } = req.body;
 
       if (!examId || !athleteId || !grade) {
         return res.status(400).json({
@@ -140,7 +139,8 @@ export const ExameController = {
       const result = await ExameService.updateExamResult(
         examId,
         athleteId,
-        grade
+        grade,
+        observations
       );
       res.status(200).json(result);
     } catch (error) {
@@ -153,4 +153,90 @@ export const ExameController = {
       });
     }
   },
+
+  getParticipants: async (req: Request, res: Response) => {
+    try {
+      const examId = req.params.id;
+      const participants = await ExameService.getExamParticipants(examId);
+      res.status(200).json(participants);
+    } catch (error) {
+      console.error("Erro ao buscar participantes do exame:", error);
+      res.status(400).json({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Falha ao buscar participantes do exame",
+      });
+    }
+  },
+
+  update: async (req: Request, res: Response) => {
+    try {
+      const { name, date, location, belt, maxParticipants, description } = req.body;
+      const examId = req.params.id;
+      const userId = req.user?.id;
+
+      console.log('Dados recebidos:', {
+        name,
+        date,
+        location,
+        belt,
+        maxParticipants,
+        description,
+        examId,
+        userId
+      });
+
+      // Validar se os campos existem e não são vazios
+      if (!name?.trim() || !date || !location?.trim() || !belt?.trim()) {
+        console.log('Campos faltando:', {
+          name: !name?.trim(),
+          date: !date,
+          location: !location?.trim(),
+          belt: !belt?.trim()
+        });
+        return res.status(400).json({ 
+          message: 'Campos obrigatórios faltando',
+          missing: {
+            name: !name?.trim(),
+            date: !date,
+            location: !location?.trim(),
+            belt: !belt?.trim()
+          }
+        });
+      }
+
+      const exam = await Exam.findById(examId);
+      if (!exam) {
+        return res.status(404).json({ message: 'Exame não encontrado' });
+      }
+
+      if (exam.instructor.toString() !== userId) {
+        return res.status(403).json({ message: 'Não autorizado' });
+      }
+
+      // Se houver participantes, não permite alterar a data
+      if (exam.participants && exam.participants.length > 0 && new Date(exam.date).getTime() !== new Date(date).getTime()) {
+        return res.status(400).json({ message: 'Não é possível alterar a data de um exame com participantes' });
+      }
+
+      const updatedExam = await Exam.findByIdAndUpdate(
+        examId,
+        {
+          name: name.trim(),
+          date: new Date(date),
+          location: location.trim(),
+          belt: belt.trim(),
+          maxParticipants: Number(maxParticipants) || 10,
+          description: description?.trim()
+        },
+        { new: true }
+      );
+
+      res.json(updatedExam);
+    } catch (error) {
+      console.error('Erro ao atualizar exame:', error);
+      res.status(500).json({ message: 'Erro ao atualizar exame' });
+    }
+  }
 };

@@ -91,12 +91,26 @@ export class ExameService {
       const skip = (page - 1) * limit;
 
       const exams = await Exam.find(filters)
-        .populate('instructor', 'name email')
-        .populate('createdBy', 'name email')
-        .populate('participants', 'name email')
+        .populate({
+          path: 'instructor',
+          select: 'name email'
+        })
+        .populate({
+          path: 'createdBy',
+          select: 'name email'
+        })
+        .populate({
+          path: 'participants',
+          select: 'name email'
+        })
+        .populate({
+          path: 'results.athleteId',
+          select: 'name email'
+        })
         .sort({ date: 1 })
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean();
 
       const totalCount = await Exam.countDocuments(filters);
       const totalPages = Math.ceil(totalCount / limit);
@@ -149,41 +163,22 @@ export class ExameService {
         );
       }
 
-      // Check if athlete has any pending payments
-      const hasPendingPayments = athlete.payments?.some(
-        (payment) => payment.status === "pending"
-      );
-      if (hasPendingPayments) {
-        throw new Error("Não é possível se inscrever com pagamentos pendentes");
-      }
-
       // Check if athlete is already registered
-      const isAlreadyRegistered = exam.participants.some(
-        (participantId) => participantId.toString() === athleteId
-      );
-
-      if (isAlreadyRegistered) {
+      if (exam.participants.includes(athleteId)) {
         throw new Error("Você já está inscrito neste exame");
       }
 
-      // Register athlete for exam using updateOne
-      const result = await Exam.updateOne(
-        { _id: examId },
-        { $push: { participants: athlete._id } }
-      );
+      // Add athlete to participants
+      exam.participants.push(athleteId);
+      await exam.save();
 
-      if (result.modifiedCount === 0) {
-        throw new Error("Erro ao se inscrever no exame");
-      }
+      // Return updated exam
+      const updatedExam = await Exam.findById(examId)
+        .populate('instructor', 'name email')
+        .populate('createdBy', 'name email')
+        .populate('participants', 'name email');
 
-      return {
-        message: "Inscrição realizada com sucesso",
-        exam: {
-          name: exam.name,
-          date: exam.date,
-          beltLevel: exam.beltLevel,
-        },
-      };
+      return updatedExam;
     } catch (error) {
       console.error("Error registering for exam:", error);
       throw error;
@@ -192,69 +187,198 @@ export class ExameService {
 
   static async getAthleteExams(athleteId: string) {
     try {
-      const exams = await Exam.find({ participants: athleteId })
+      // Buscar todos os exames onde o atleta é participante
+      const exams = await Exam.find({
+        participants: athleteId
+      })
         .populate({
-          path: "createdBy",
-          model: User,
-          select: "name email profilePicture",
+          path: 'instructor',
+          select: 'name email'
         })
-        .sort({ date: 1 });
+        .populate({
+          path: 'createdBy',
+          select: 'name email'
+        })
+        .populate({
+          path: 'results.athleteId',
+          select: 'name email'
+        })
+        .sort({ date: -1 });
 
-      // Mapeia os exames para incluir informações formatadas do instrutor
-      const formattedExams = exams.map((exam) => ({
-        ...exam.toObject(),
-        instructor: exam.createdBy
-          ? {
-              name: exam.createdBy.name,
-              email: exam.createdBy.email,
-              profilePicture: exam.createdBy.profilePicture,
-            }
-          : null,
-      }));
+      // Filtrar os resultados para mostrar apenas os do atleta atual
+      const examsWithFilteredResults = exams.map(exam => {
+        const examObj = exam.toObject();
+        if (examObj.results) {
+          examObj.results = examObj.results.filter(
+            result => result.athleteId._id.toString() === athleteId
+          );
+        }
+        return examObj;
+      });
 
-      return formattedExams;
+      return examsWithFilteredResults;
     } catch (error) {
       console.error("Error fetching athlete exams:", error);
-      throw new Error("Failed to fetch athlete exams");
+      throw error;
     }
   }
 
   static async updateExamResult(
     examId: string,
     athleteId: string,
-    grade: string
+    grade: string,
+    observations?: string
   ) {
     try {
       const exam = await Exam.findById(examId);
       if (!exam) {
-        throw new Error("Exam not found");
+        throw new Error("Exame não encontrado");
       }
 
       const athlete = await User.findById(athleteId);
       if (!athlete) {
-        throw new Error("Athlete not found");
+        throw new Error("Atleta não encontrado");
       }
 
-      // Add exam result to athlete's record
-      athlete.examResults = athlete.examResults || [];
+      // Verificar se o atleta está inscrito no exame
+      const isRegistered = exam.participants.some(
+        (participantId) => participantId.toString() === athleteId
+      );
+
+      if (!isRegistered) {
+        throw new Error("Atleta não está inscrito neste exame");
+      }
+
+      // Verificar se já existe um resultado para este atleta
+      const existingResultIndex = exam.results?.findIndex(
+        result => result.athleteId.toString() === athleteId
+      );
+
+      // Preparar o resultado
+      const examResult = {
+        athleteId,
+        grade,
+        observations
+      };
+
+      if (existingResultIndex !== undefined && existingResultIndex >= 0) {
+        // Atualizar resultado existente
+        exam.results[existingResultIndex] = examResult;
+      } else {
+        // Adicionar novo resultado
+        if (!exam.results) {
+          exam.results = [];
+        }
+        exam.results.push(examResult);
+      }
+
+      // Se o atleta foi aprovado (nota >= 7), atualizar a faixa
+      if (Number(grade) >= 7) {
+        // Pegar a faixa mais alta do exame
+        const examBelts = exam.beltLevel;
+        if (examBelts && examBelts.length > 0) {
+          const currentBeltIndex = Object.values(belts).indexOf(athlete.belt);
+          const examBeltIndex = Math.max(...examBelts.map(belt => Object.values(belts).indexOf(belt)));
+          
+          // Só atualiza se a faixa do exame for maior que a atual
+          if (examBeltIndex > currentBeltIndex) {
+            athlete.belt = Object.values(belts)[examBeltIndex];
+          }
+        }
+      }
+
+      // Adicionar ao histórico do atleta
+      if (!athlete.examResults) {
+        athlete.examResults = [];
+      }
       athlete.examResults.push({
         examId: exam._id,
         grade,
         date: exam.date,
+        observations
       });
 
-      await athlete.save();
+      // Salvar as alterações
+      await Promise.all([exam.save(), athlete.save()]);
 
       return {
-        message: "Exam result recorded successfully",
+        message: "Resultado registrado com sucesso",
         result: {
           examName: exam.name,
+          athleteName: athlete.name,
           grade,
+          observations,
           date: exam.date,
+          newBelt: athlete.belt // Retornar a nova faixa, se foi atualizada
         },
       };
     } catch (error) {
       console.error("Error updating exam result:", error);
+      throw error;
+    }
+  }
+
+  static async getExamParticipants(examId: string) {
+    try {
+      const exam = await Exam.findById(examId)
+        .populate({
+          path: 'participants',
+          select: '_id name belt profilePicture',
+          model: User
+        });
+
+      if (!exam) {
+        throw new Error("Exame não encontrado");
+      }
+
+      return exam.participants;
+    } catch (error) {
+      console.error("Error getting exam participants:", error);
+      throw error;
+    }
+  }
+
+  static async updateExam(
+    examId: string,
+    userId: string,
+    updateData: {
+      name: string;
+      date: Date;
+      location: string;
+      belt: string;
+      maxParticipants?: number;
+      description?: string;
+    }
+  ) {
+    try {
+      const exam = await Exam.findById(examId);
+      
+      if (!exam) {
+        throw new Error("Exame não encontrado");
+      }
+
+      // Verificar se o instrutor é o dono do exame
+      if (exam.instructor.toString() !== userId) {
+        throw new Error("Você não tem permissão para editar este exame");
+      }
+
+      // Se houver participantes, não permite alterar a data
+      if (exam.participants.length > 0 && updateData.date && exam.date.toString() !== updateData.date) {
+        throw new Error("Não é possível alterar a data de um exame que já possui participantes");
+      }
+
+      // Atualizar os campos permitidos
+      const allowedUpdates = ['name', 'date', 'location', 'belt', 'maxParticipants', 'description'];
+      allowedUpdates.forEach(field => {
+        if (updateData[field] !== undefined) {
+          exam[field] = updateData[field];
+        }
+      });
+
+      await exam.save();
+      return exam;
+    } catch (error) {
+      console.error("Error updating exam:", error);
       throw error;
     }
   }
