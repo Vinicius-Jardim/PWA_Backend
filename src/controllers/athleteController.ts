@@ -39,8 +39,9 @@ export const AthleteController = {
         pageSize: parseInt(req.query.pageSize as string) || 10
       };
 
-      // Buscar atletas com suas mensalidades
+      // Buscar atletas
       const athletes = await User.find({ role: roles.ATHLETE })
+        .select('-payments') // Remove apenas o campo payments
         .skip((params.page - 1) * params.pageSize)
         .limit(params.pageSize)
         .lean();
@@ -48,15 +49,18 @@ export const AthleteController = {
       // Buscar mensalidades dos atletas
       const athletesWithFees = await Promise.all(
         athletes.map(async (athlete) => {
+          // Buscar a mensalidade mais recente do atleta, independente do status
           const currentFee = await MonthlyFee.findOne({
-            userId: athlete._id,
-            status: { $ne: "paid" }
-          }).sort({ dueDate: 1 }).lean();
+            userId: athlete._id
+          })
+          .sort({ createdAt: -1 }) // Pega a mais recente
+          .populate('planId', 'name price') // Popula os dados do plano
+          .lean();
 
           return {
             ...athlete,
             currentFee,
-            hasPendingPayment: !!currentFee
+            hasPendingPayment: currentFee?.status !== 'paid'
           };
         })
       );
