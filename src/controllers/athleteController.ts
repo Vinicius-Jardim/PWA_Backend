@@ -66,7 +66,8 @@ export const AthleteController = {
           return {
             ...athlete,
             currentFee,
-            hasPendingPayment: currentFee?.status !== 'paid'
+            // Só tem pagamento pendente se tiver um plano E o status não for 'paid'
+            hasPendingPayment: currentFee ? currentFee.status !== 'paid' : false
           };
         })
       );
