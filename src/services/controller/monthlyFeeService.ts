@@ -1,4 +1,5 @@
 import { MonthlyFee } from "../../models/monthlyFeeModel";
+import User from "../../models/userModel";
 
 export const MonthlyFeeService = {
   getByUserId: async (userId: string) => {
@@ -26,24 +27,52 @@ export const MonthlyFeeService = {
 
   markAsPaid: async (feeId: string) => {
     try {
-      const fee = await MonthlyFee.findByIdAndUpdate(
-        feeId,
-        {
-          $set: {
-            status: 'paid',
-            paidAt: new Date()
-          }
-        },
-        { new: true }
-      )
-        .populate('userId', 'name')
-        .populate('planId', 'name price');
-      
+      // Primeiro encontra a mensalidade
+      const fee = await MonthlyFee.findById(feeId);
       if (!fee) {
         throw new Error('Monthly fee not found');
       }
 
-      return fee;
+      // Atualiza o status do usuário primeiro
+      const updatedUser = await User.findByIdAndUpdate(
+        fee.userId,
+        { suspended: false },
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        throw new Error('User not found');
+      }
+
+      // Depois atualiza a mensalidade
+      const updatedFee = await MonthlyFee.findByIdAndUpdate(
+        feeId,
+        {
+          status: 'paid',
+          paidAt: new Date()
+        },
+        { new: true }
+      )
+        .populate('userId')
+        .populate('planId', 'name price');
+
+      if (!updatedFee) {
+        throw new Error('Error updating fee');
+      }
+
+      // Força a atualização do status do usuário
+      await User.updateOne(
+        { _id: fee.userId },
+        { $set: { suspended: false } }
+      );
+
+      return {
+        ...updatedFee.toObject(),
+        userId: {
+          ...updatedFee.userId,
+          suspended: false
+        }
+      };
     } catch (error) {
       throw error;
     }

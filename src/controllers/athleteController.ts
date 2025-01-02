@@ -41,7 +41,7 @@ export const AthleteController = {
 
       // Buscar atletas
       const athletes = await User.find({ role: roles.ATHLETE })
-        .select('-payments') // Remove apenas o campo payments
+        .select('-payments')
         .skip((params.page - 1) * params.pageSize)
         .limit(params.pageSize)
         .lean();
@@ -49,13 +49,19 @@ export const AthleteController = {
       // Buscar mensalidades dos atletas
       const athletesWithFees = await Promise.all(
         athletes.map(async (athlete) => {
-          // Buscar a mensalidade mais recente do atleta, independente do status
+          // Buscar a mensalidade mais recente do atleta
           const currentFee = await MonthlyFee.findOne({
             userId: athlete._id
           })
-          .sort({ createdAt: -1 }) // Pega a mais recente
-          .populate('planId', 'name price') // Popula os dados do plano
+          .sort({ createdAt: -1 })
+          .populate('planId', 'name price')
           .lean();
+
+          // Se a mensalidade está paga, atualiza o status do usuário
+          if (currentFee?.status === 'paid') {
+            await User.findByIdAndUpdate(athlete._id, { suspended: false });
+            athlete.suspended = false;
+          }
 
           return {
             ...athlete,
