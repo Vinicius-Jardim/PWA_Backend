@@ -24,7 +24,7 @@ const ExamSchema: Schema = new Schema<IExam>(
   {
     name: { type: String, required: true },
     date: { type: Date, required: true },
-    location: { type: String, required: true },
+    location: { type: String }, // Removido required
     maxParticipants: { type: Number, required: true, default: 10 },
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     beltLevel: [{ 
@@ -41,7 +41,7 @@ const ExamSchema: Schema = new Schema<IExam>(
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false, // Agora é opcional
     },
     results: [{
       athleteId: {

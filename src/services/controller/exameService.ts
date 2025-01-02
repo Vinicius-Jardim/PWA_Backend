@@ -5,41 +5,25 @@ import User, { roles, belts } from "../../models/userModel";
 import { Op } from "sequelize";
 
 export class ExameService {
-  static async create(
-    exame: IExam,
-    instructorId: { id: string; role: string }
-  ): Promise<IExam> {
+  static async create(examData: Partial<IExam>, user: any): Promise<IExam> {
     try {
-      const { name, date, beltLevel, maxParticipants } = exame;
+      // Se não houver instrutor definido, usar o criador como instrutor
+      const examWithInstructor = {
+        ...examData,
+        instructor: examData.instructor || user.id,
+        createdBy: user.id
+      };
 
-      // Validate instructor
-      const instructor = await User.findById(instructorId.id);
-      if (!instructor) {
-        throw new Error("Instructor not found");
-      }
+      const exam = new Exam(examWithInstructor);
+      await exam.save();
 
-      // Validate and typecast multiple belt levels
-      const validBeltLevels = validateBeltLevels(beltLevel);
-
-      // Create exam with instructor
-      const newExame = await Exam.create({
-        name,
-        date,
-        maxParticipants,
-        beltLevel: validBeltLevels,
-        createdBy: instructor._id,
-        instructor: instructor._id, // Definir o instrutor
-      });
-
-      // Populate instructor details
-      await newExame.populate('instructor', 'name email');
-
-      return newExame;
+      // Retornar o exame populado com os dados do instrutor
+      return await Exam.findById(exam._id)
+        .populate('instructor', 'name email')
+        .populate('createdBy', 'name email');
     } catch (error) {
-      console.error("Error during exam creation:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      throw new Error("Failed to create exam: " + errorMessage);
+      console.error("Error creating exam:", error);
+      throw error;
     }
   }
 
@@ -90,36 +74,112 @@ export class ExameService {
     try {
       const skip = (page - 1) * limit;
 
-      const exams = await Exam.find(filters)
-        .populate({
-          path: 'instructor',
-          select: 'name email'
-        })
-        .populate({
-          path: 'createdBy',
-          select: 'name email'
-        })
-        .populate({
-          path: 'participants',
-          select: 'name email'
-        })
-        .populate({
-          path: 'results.athleteId',
-          select: 'name email'
-        })
-        .sort({ date: 1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
+      // Construir a pipeline de agregação
+      const pipeline = [
+        // Lookup para pegar dados do instrutor
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'instructor',
+            foreignField: '_id',
+            as: 'instructorData'
+          }
+        },
+        // Unwind para transformar o array em objeto
+        {
+          $unwind: {
+            path: '$instructorData',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        // Lookup para pegar dados do criador
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'createdBy',
+            foreignField: '_id',
+            as: 'createdByData'
+          }
+        },
+        // Unwind para transformar o array em objeto
+        {
+          $unwind: {
+            path: '$createdByData',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        // Match para filtrar
+        {
+          $match: {
+            $and: [
+              filters.name ? {
+                $or: [
+                  { name: { $regex: filters.name, $options: 'i' } },
+                  { 'instructorData.name': { $regex: filters.name, $options: 'i' } },
+                  { 'createdByData.name': { $regex: filters.name, $options: 'i' } }
+                ]
+              } : {},
+              filters.beltLevel ? { beltLevel: filters.beltLevel } : {}
+            ]
+          }
+        },
+        // Lookup para participantes
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'participants',
+            foreignField: '_id',
+            as: 'participantsData'
+          }
+        },
+        // Project para formatar os dados
+        {
+          $project: {
+            name: 1,
+            date: 1,
+            maxParticipants: 1,
+            beltLevel: 1,
+            location: 1,
+            results: 1,
+            participants: '$participantsData',
+            instructor: {
+              _id: '$instructorData._id',
+              name: '$instructorData.name',
+              email: '$instructorData.email'
+            },
+            createdBy: {
+              _id: '$createdByData._id',
+              name: '$createdByData.name',
+              email: '$createdByData.email'
+            }
+          }
+        }
+      ];
 
-      const totalCount = await Exam.countDocuments(filters);
-      const totalPages = Math.ceil(totalCount / limit);
+      // Adicionar sort, skip e limit
+      pipeline.push(
+        { $sort: { date: 1 } },
+        { $skip: skip },
+        { $limit: limit }
+      );
+
+      // Executar a pipeline
+      const exams = await Exam.aggregate(pipeline);
+
+      // Contar total
+      const totalCount = await Exam.aggregate([
+        ...pipeline.slice(0, pipeline.findIndex(p => '$sort' in p)),
+        { $count: 'total' }
+      ]);
+
+      const total = totalCount[0]?.total || 0;
+      const totalPages = Math.ceil(total / limit);
 
       return {
         exams,
         totalPages,
         currentPage: page,
-        totalCount,
+        totalCount: total
       };
     } catch (error) {
       console.error("Error fetching all exams:", error);
@@ -129,56 +189,39 @@ export class ExameService {
 
   static async registerForExam(examId: string, athleteId: string) {
     try {
+      // Buscar o exame e popular o instrutor e criador
       const exam = await Exam.findById(examId)
-        .populate('instructor')
-        .populate('createdBy');
-        
+        .populate('instructor', 'name email')
+        .populate('createdBy', 'name email');
+
       if (!exam) {
         throw new Error("Exame não encontrado");
       }
 
-      // Check if exam is full
+      // Verificar se o exame tem um instrutor ou criador
+      if (!exam.instructor && !exam.createdBy) {
+        throw new Error("Instrutor não definido para este exame");
+      }
+
+      // Verificar se ainda há vagas
       if (exam.participants.length >= exam.maxParticipants) {
-        throw new Error("Exame já está lotado");
+        throw new Error("Exame já está com todas as vagas preenchidas");
       }
 
-      // Get athlete info
-      const athlete = await User.findById(athleteId);
-      if (!athlete || athlete.role !== roles.ATHLETE) {
-        throw new Error("Atleta não encontrado");
-      }
-      if (!athlete.instructorId) {
-        throw new Error("Atleta não possui um instrutor");
-      }
-
-      // Check if athlete meets belt requirements
-      const athleteBelt = athlete.belt;
-      const allowedBelts = exam.beltLevel;
-
-      if (athleteBelt && !allowedBelts.includes(athleteBelt)) {
-        throw new Error(
-          `Sua faixa (${athleteBelt}) não é elegível para este exame. Faixas permitidas: ${allowedBelts.join(
-            ", "
-          )}`
-        );
-      }
-
-      // Check if athlete is already registered
-      if (exam.participants.includes(athleteId)) {
+      // Verificar se o atleta já está inscrito
+      const isParticipant = exam.participants.some(
+        (participantId) => participantId.toString() === athleteId
+      );
+      
+      if (isParticipant) {
         throw new Error("Você já está inscrito neste exame");
       }
 
-      // Add athlete to participants
+      // Adicionar o atleta à lista de participantes
       exam.participants.push(athleteId);
       await exam.save();
 
-      // Return updated exam
-      const updatedExam = await Exam.findById(examId)
-        .populate('instructor', 'name email')
-        .populate('createdBy', 'name email')
-        .populate('participants', 'name email');
-
-      return updatedExam;
+      return exam;
     } catch (error) {
       console.error("Error registering for exam:", error);
       throw error;
@@ -323,7 +366,7 @@ export class ExameService {
       const exam = await Exam.findById(examId)
         .populate({
           path: 'participants',
-          select: '_id name belt profilePicture',
+          select: 'name email belt profilePicture',
           model: User
         });
 
@@ -331,7 +374,15 @@ export class ExameService {
         throw new Error("Exame não encontrado");
       }
 
-      return exam.participants;
+      // Garantir que participants é um array
+      const participants = exam.participants || [];
+
+      // Buscar os detalhes dos participantes
+      const participantsDetails = await User.find({
+        _id: { $in: participants }
+      }).select('name email belt profilePicture');
+
+      return participantsDetails;
     } catch (error) {
       console.error("Error getting exam participants:", error);
       throw error;
@@ -428,6 +479,59 @@ export class ExameService {
       };
     } catch (error) {
       console.error("Error unregistering from exam:", error);
+      throw error;
+    }
+  }
+
+  static async deleteExam(examId: string, userId: string): Promise<void> {
+    try {
+      const exam = await Exam.findById(examId).populate('instructor', '_id');
+      
+      if (!exam) {
+        throw new Error("Exame não encontrado");
+      }
+
+      // Verificar se o usuário é o instrutor do exame
+      const instructorId = exam.instructor && exam.instructor._id ? exam.instructor._id.toString() : null;
+
+      // Verificar se o usuário criou o exame
+      const createdById = exam.createdBy ? exam.createdBy.toString() : null;
+
+      // Log para debug
+      console.log('Delete exam debug:', {
+        userId,
+        instructorId,
+        createdById,
+        exam
+      });
+
+      if (instructorId !== userId && createdById !== userId) {
+        throw new Error("Não autorizado a deletar este exame");
+      }
+
+      await Exam.findByIdAndDelete(examId);
+    } catch (error) {
+      console.error("Erro ao deletar exame:", error);
+      throw error;
+    }
+  }
+
+  static async updateUserBelt(examId: string, userId: string): Promise<void> {
+    try {
+      const exam = await Exam.findById(examId);
+      if (!exam) {
+        throw new Error("Exame não encontrado");
+      }
+
+      const result = exam.results.find(r => r.athleteId.toString() === userId);
+      if (!result || result.grade < 7) {
+        throw new Error("Usuário não aprovado neste exame");
+      }
+
+      const targetBelt = exam.beltLevel[exam.beltLevel.length - 1];
+      await User.findByIdAndUpdate(userId, { belt: targetBelt });
+    } catch (error) {
+      console.error("Erro ao atualizar faixa do usuário:", error);
       throw error;
     }
   }

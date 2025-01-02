@@ -50,6 +50,31 @@ export class UserService {
     }
   }
 
+  static async updateBelt(userId: string, belt: string) {
+    try {
+      // Validar se a faixa é válida
+      if (!Object.values(belts).includes(belt)) {
+        throw new Error('Faixa inválida');
+      }
+
+      // Atualizar a faixa do atleta
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { belt },
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        throw new Error('Usuário não encontrado');
+      }
+
+      return updatedUser;
+    } catch (error) {
+      console.error('Erro ao atualizar faixa:', error);
+      throw error;
+    }
+  }
+
   static async updateAthleteBelt(
     athleteId: string,
     newBelt: string,

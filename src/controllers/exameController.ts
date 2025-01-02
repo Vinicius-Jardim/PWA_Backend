@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ExameService } from "../services/controller/exameService";
 import { Exam } from "../models/examModel"; // Import the Exam model
+import { User } from "../models/userModel"; // Import the User model
 
 export const ExameController = {
   create: async (req: Request, res: Response) => {
@@ -55,18 +56,28 @@ export const ExameController = {
 
   all: async (req: Request, res: Response) => {
     try {
-      // Extrair os parâmetros de consulta
-      const page = parseInt(req.query.page as string) || 1; // Página padrão: 1
-      const limit = parseInt(req.query.limit as string) || 10; // Limite padrão: 10
-      const beltLevel = req.query.beltLevel as string; // Nível de faixa
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const beltLevel = req.query.beltLevel as string;
+      const instructor = req.query.instructor as string;
 
-      // Construir filtros baseados em beltLevel
-      const filters = beltLevel ? { beltLevel } : {};
+      // Construir filtros
+      const filters: any = {};
+      
+      if (search) {
+        filters.name = search;
+      }
+      
+      if (beltLevel) {
+        filters.beltLevel = beltLevel;
+      }
 
-      // Buscar os exames com os filtros, paginação e limite
+      if (instructor) {
+        filters.instructorName = instructor;
+      }
+
       const result = await ExameService.getAllExams(filters, page, limit);
-
-      // Responder com o resultado
       res.status(200).json(result);
     } catch (error) {
       console.error("Error in getAllExams controller:", error);
@@ -237,6 +248,38 @@ export const ExameController = {
     } catch (error) {
       console.error('Erro ao atualizar exame:', error);
       res.status(500).json({ message: 'Erro ao atualizar exame' });
+    }
+  },
+
+  delete: async (req: Request, res: Response) => {
+    try {
+      const examId = req.params.id;
+      await ExameService.deleteExam(examId, req.user.id);
+      res.status(200).json({ message: "Exame deletado com sucesso" });
+    } catch (error) {
+      console.error("Erro ao deletar exame:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Erro interno do servidor" });
+      }
+    }
+  },
+
+  updateBelt: async (req: Request, res: Response) => {
+    try {
+      const examId = req.params.examId;
+      const athleteId = req.params.athleteId;
+
+      await ExameService.updateUserBelt(examId, athleteId);
+      res.status(200).json({ message: "Faixa do atleta atualizada com sucesso" });
+    } catch (error) {
+      console.error("Erro ao atualizar faixa do atleta:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Erro interno do servidor" });
+      }
     }
   }
 };
