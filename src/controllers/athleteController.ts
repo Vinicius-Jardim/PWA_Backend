@@ -140,12 +140,36 @@ export const AthleteController = {
         });
       }
 
+      // Atualiza o status do atleta para suspenso
       athlete.suspended = true;
       await athlete.save();
 
+      // Busca e atualiza a mensalidade atual para pending
+      const currentFee = await MonthlyFee.findOne({ 
+        userId: athleteId 
+      }).sort({ createdAt: -1 });
+
+      if (currentFee) {
+        currentFee.status = "pending";
+        currentFee.paidAt = undefined;
+        await currentFee.save();
+      }
+
+      // Busca o atleta atualizado com a mensalidade
+      const updatedAthlete = await User.findById(athleteId).lean();
+      const updatedFee = await MonthlyFee.findOne({ 
+        userId: athleteId 
+      })
+      .sort({ createdAt: -1 })
+      .populate('planId', 'name price')
+      .lean();
+
       res.status(200).json({
         message: "Atleta suspenso com sucesso",
-        athlete
+        athlete: {
+          ...updatedAthlete,
+          currentFee: updatedFee
+        }
       });
     } catch (error) {
       console.error("Erro ao suspender atleta:", error);
