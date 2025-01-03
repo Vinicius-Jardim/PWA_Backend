@@ -114,21 +114,21 @@ const UserSchema: Schema = new Schema(
       ref: "User",
       validate: [
         {
-          validator: function (this: { role: string }, value: Types.ObjectId[]) {
-            return this.role === roles.INSTRUCTOR;
+          validator(this: { role: string }, value: Types.ObjectId[]) {
+            return !value || value.length === 0 || this.role === roles.INSTRUCTOR;
           },
           message: "Only INSTRUCTOR can have associated athletes.",
         },
         {
           validator(athletes: Types.ObjectId[]) {
-            return athletes.length <= 10;
+            return !athletes || athletes.length <= 10;
           },
           message: "An instructor can have at most 10 associated athletes.",
         },
       ],
-      default: function (this: { role: string }) {
+      default(this: { role: string }) {
         return this.role === roles.INSTRUCTOR ? [] : undefined;
-      }
+      },
     },
     payments: [
       {
