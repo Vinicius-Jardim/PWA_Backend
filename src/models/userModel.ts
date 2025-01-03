@@ -31,13 +31,13 @@ export interface IUser extends Document {
   password: string;
   role: keyof typeof roles;
   belt?: keyof typeof belts;
-  age?: number;
+  birthDate?: Date;
+  phone?: string;
   gender?: "male" | "female";
   monthlyFee?: number;
   joinedDate?: Date;
   instructorId?: Types.ObjectId;
   athletes?: Types.ObjectId[];
-  examSchedule?: { date: Date; location: string }[];
   payments?: { date: Date; amount: number; status: "paid" | "pending" }[];
   examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
   qrCode?: string;
@@ -77,7 +77,24 @@ const UserSchema: Schema = new Schema(
         return this.role === roles.ATHLETE ? belts.WHITE : undefined;
       },
     },
-    age: { type: Number },
+    birthDate: { 
+      type: Date,
+      validate: {
+        validator: function(date: Date) {
+          return date <= new Date();
+        },
+        message: "Data de nascimento não pode ser no futuro"
+      }
+    },
+    phone: { 
+      type: String,
+      validate: {
+        validator: function(v: string) {
+          return /^\+?[\d\s-()]+$/.test(v);
+        },
+        message: "Formato de telefone inválido"
+      }
+    },
     gender: { type: String, enum: ["male", "female"] },
     monthlyFee: { type: Number },
     joinedDate: { type: Date, default: Date.now },
@@ -97,30 +114,22 @@ const UserSchema: Schema = new Schema(
       ref: "User",
       validate: [
         {
-          validator: function (
-            this: { role: string },
-            athletes: Types.ObjectId[]
-          ) {
-            // Apenas INSTRUCTOR pode ter atletas associados
-            return this.role === roles.INSTRUCTOR || athletes.length === 0;
+          validator: function (this: { role: string }, value: Types.ObjectId[]) {
+            return this.role === roles.INSTRUCTOR;
           },
           message: "Only INSTRUCTOR can have associated athletes.",
         },
         {
-          validator: function (athletes: Types.ObjectId[]) {
-            // Garantir que o número de atletas não exceda 10
+          validator(athletes: Types.ObjectId[]) {
             return athletes.length <= 10;
           },
           message: "An instructor can have at most 10 associated athletes.",
         },
       ],
+      default: function (this: { role: string }) {
+        return this.role === roles.INSTRUCTOR ? [] : undefined;
+      }
     },
-    examSchedule: [
-      {
-        date: { type: Date },
-        location: { type: String },
-      },
-    ],
     payments: [
       {
         date: { type: Date },
@@ -128,19 +137,15 @@ const UserSchema: Schema = new Schema(
         status: { type: String, enum: ["paid", "pending"] },
       },
     ],
-    examResults: [
-      {
-        examId: { type: Schema.Types.ObjectId, ref: "Exam" },
-        grade: { type: String },
-        date: { type: Date },
-      },
-    ],
+    examResults: [{
+      examId: { type: Schema.Types.ObjectId, ref: 'Exam' },
+      grade: String,
+      date: { type: Date, default: Date.now }
+    }],
     qrCode: { type: String },
-    avatarUrl: { type: String },
+    avatarUrl: { type: String }
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 // Método para verificar permissões
@@ -157,22 +162,18 @@ UserSchema.methods.hasPermission = function (
 UserSchema.pre("save", function (next) {
   const user = this as IUser;
 
-  // Se não for atleta, remove campos específicos de atleta
-  if (user.role !== roles.ATHLETE) {
+  // Limpar campos baseado no papel do usuário
+  if (user.role === roles.ATHLETE) {
+    user.credentialNumber = undefined;
+    user.athletes = undefined;
+  } else if (user.role === roles.INSTRUCTOR) {
     user.belt = undefined;
-    user.instructorId = undefined;
     user.monthlyFee = undefined;
-  }
-
-  // Se não for instrutor, remove lista de atletas
-  if (user.role !== roles.INSTRUCTOR) {
-    user.athletes = [];
+    user.instructorId = undefined;
+    user.birthDate = undefined;
   }
 
   next();
 });
-
-export type RoleType = keyof typeof roles;
-export type BeltType = keyof typeof belts;
 
 export default mongoose.model<IUser>("User", UserSchema);

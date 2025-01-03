@@ -10,15 +10,7 @@ export const AuthController = {
 
     try {
 
-      const { name, email, password, confirmPassword, instructorId } = req.body;
-
-      const result = await AuthService.register(
-        name,
-        email,
-        password,
-        confirmPassword,
-        instructorId
-      );
+      const result = await AuthService.register(req.body);
 
       res.status(201).json(result);
 

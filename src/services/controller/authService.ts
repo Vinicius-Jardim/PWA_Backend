@@ -18,14 +18,18 @@ const setAuthCookie = (res: Response, token: string) => {
 
 export class AuthService {
   // Register for athletes
-  static async register(
+  static async register(userData: {
     name: string,
     email: string,
     password: string,
     confirmPassword: string,
-    instructorId?: string
-  ) {
+    instructorId?: string,
+    birthDate?: string,
+    gender?: string
+  }) {
     try {
+      const { name, email, password, confirmPassword, instructorId, birthDate, gender } = userData;
+
       // Check required fields
       if (!name || !email || !password) {
         throw new Error("Name, email, and password are required");
@@ -67,6 +71,9 @@ export class AuthService {
         password: hashPassword,
         role: roles.ATHLETE,
         instructorId: instructor?._id,
+        birthDate: birthDate ? new Date(birthDate) : undefined,
+        gender,
+        belt: "WHITE"
       });
 
       await newUser.save();

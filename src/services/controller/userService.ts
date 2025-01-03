@@ -16,7 +16,8 @@ export class UserService {
           email: userData.email,
           instructorId: userData.instructorId,
           belt: userData.belt,
-          age: userData.age,
+          birthDate: userData.birthDate,
+          phone: userData.phone,
           joinedDate: userData.joinedDate,
           monthlyFee: userData.monthlyFee,
           gender: userData.gender,
@@ -179,6 +180,70 @@ export class UserService {
       return user;
     } catch (error) {
       console.error("Error updating avatar:", error);
+      throw error;
+    }
+  }
+
+  static async updateProfile(userId: string, data: { 
+    name: string; 
+    email: string;
+    phone?: string;
+    birthDate?: Date;
+  }) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new Error('Usuário não encontrado');
+      }
+
+      // Atualizar os campos permitidos
+      user.name = data.name;
+      user.email = data.email;
+      if (data.phone) user.phone = data.phone;
+      if (data.birthDate) user.birthDate = new Date(data.birthDate);
+
+      const updatedUser = await user.save();
+
+      // Retornar os dados baseado no papel do usuário
+      if (updatedUser.role === roles.ATHLETE) {
+        return {
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          birthDate: updatedUser.birthDate,
+          instructorId: updatedUser.instructorId,
+          belt: updatedUser.belt,
+          age: updatedUser.age,
+          joinedDate: updatedUser.joinedDate,
+          monthlyFee: updatedUser.monthlyFee,
+          gender: updatedUser.gender,
+          avatarUrl: updatedUser.avatarUrl,
+        };
+      }
+      if (updatedUser.role === roles.INSTRUCTOR) {
+        return {
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          birthDate: updatedUser.birthDate,
+          athletes: updatedUser.athletes,
+          examSchedule: updatedUser.examSchedule,
+          avatarUrl: updatedUser.avatarUrl,
+        };
+      }
+      if (updatedUser.role === roles.ADMIN) {
+        return {
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          birthDate: updatedUser.birthDate,
+          role: updatedUser.role,
+          avatarUrl: updatedUser.avatarUrl,
+        };
+      }
+      return updatedUser;
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error);
       throw error;
     }
   }
