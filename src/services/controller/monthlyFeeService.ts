@@ -1,5 +1,6 @@
 import { MonthlyFee } from "../../models/monthlyFeeModel";
 import User from "../../models/userModel";
+import { PaymentHistory } from "../../models/paymentHistoryModel";
 
 export const MonthlyFeeService = {
   getByUserId: async (userId: string) => {
@@ -25,7 +26,7 @@ export const MonthlyFeeService = {
     }
   },
 
-  markAsPaid: async (feeId: string) => {
+  markAsPaid: async (feeId: string, instructorId: string) => {
     try {
       // Primeiro encontra a mensalidade
       const fee = await MonthlyFee.findById(feeId);
@@ -44,35 +45,46 @@ export const MonthlyFeeService = {
         throw new Error('User not found');
       }
 
-      // Depois atualiza a mensalidade
+      const paidAt = new Date();
+
+      // Atualiza a mensalidade
       const updatedFee = await MonthlyFee.findByIdAndUpdate(
         feeId,
         {
           status: 'paid',
-          paidAt: new Date()
+          paidAt
         },
         { new: true }
-      )
-        .populate('userId')
-        .populate('planId', 'name price');
+      ).populate('userId').populate('planId');
 
-      if (!updatedFee) {
-        throw new Error('Error updating fee');
-      }
+      // Cria o registro no histórico
+      await PaymentHistory.create({
+        userId: fee.userId,
+        monthlyFeeId: feeId,
+        amount: fee.amount,
+        paidAt,
+        markedByUserId: instructorId
+      });
 
-      // Força a atualização do status do usuário
-      await User.updateOne(
-        { _id: fee.userId },
-        { $set: { suspended: false } }
-      );
+      return updatedFee;
+    } catch (error) {
+      throw error;
+    }
+  },
 
-      return {
-        ...updatedFee.toObject(),
-        userId: {
-          ...updatedFee.userId,
-          suspended: false
-        }
-      };
+  getPaymentHistory: async (userId: string) => {
+    try {
+      const history = await PaymentHistory.find({ userId })
+        .sort({ paidAt: -1 })
+        .populate({
+          path: 'monthlyFeeId',
+          populate: {
+            path: 'planId',
+            select: 'name'
+          }
+        })
+        .populate('markedByUserId', 'name');
+      return history;
     } catch (error) {
       throw error;
     }
