@@ -74,12 +74,15 @@ export const UserController = {
             }
 
             const userId = req.user.id;
-            const avatarUrl = `/uploads/${req.file.filename}`;
+            const avatarUrl = `/uploads/avatars/${req.file.filename}`;
 
             const result = await UserService.updateAvatar(userId, avatarUrl);
-            res.status(200).json({ avatarUrl });
+            
+            res.status(200).json({ 
+                message: "Avatar atualizado com sucesso",
+                avatarUrl 
+            });
         } catch (error) {
-            console.error("Erro ao fazer upload do avatar:", error);
             res.status(500).json({
                 message: error instanceof Error ? error.message : "Erro ao fazer upload do avatar"
             });

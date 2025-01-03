@@ -183,7 +183,6 @@ export class UserService {
       await user.save();
       return user;
     } catch (error) {
-      console.error("Error updating avatar:", error);
       throw error;
     }
   }
@@ -195,8 +194,6 @@ export class UserService {
     birthDate?: string | null;
   }) {
     try {
-      console.log('[updateProfile] Received data:', JSON.stringify(data, null, 2));
-
       // Validar data de nascimento
       let birthDate = null;
       if (data.birthDate) {
@@ -222,8 +219,6 @@ export class UserService {
         }
       };
 
-      console.log('[updateProfile] Update data:', JSON.stringify(updateData, null, 2));
-
       // Atualizar usuário usando findOneAndUpdate do mongoose
       const result = await User.findOneAndUpdate(
         { _id: userId },
@@ -238,8 +233,6 @@ export class UserService {
         throw new Error('Usuário não encontrado');
       }
 
-      console.log('[updateProfile] Updated user:', JSON.stringify(result, null, 2));
-
       // Retornar dados atualizados
       return {
         name: result.name,
@@ -252,7 +245,6 @@ export class UserService {
         gender: result.gender
       };
     } catch (error) {
-      console.error('[updateProfile] Error:', error);
       throw error;
     }
   }

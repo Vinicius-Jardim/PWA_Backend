@@ -29,7 +29,7 @@ const ExamSchema: Schema = new Schema<IExam>(
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     beltLevel: [{ 
       type: String,
-      enum: Object.values(belts),
+      enum: ["WHITE", "YELLOW", "ORANGE", "GREEN", "BLUE", "BROWN", "BLACK"],
       required: true 
     }],
     description: { type: String },
