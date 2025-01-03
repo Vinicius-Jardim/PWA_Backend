@@ -15,9 +15,16 @@ export const UserController = {
     updateProfile: async (req: Request, res: Response): Promise<void> => {
         try {
             const userId = req.user.id;
-            const { name, email } = req.body;
+            const { name, email, phone, birthDate } = req.body;
             
-            const result = await UserService.updateProfile(userId, { name, email });
+            console.log('[updateProfile] Request body:', JSON.stringify(req.body, null, 2));
+            
+            const result = await UserService.updateProfile(userId, { 
+                name, 
+                email,
+                phone,
+                birthDate
+            });
             res.status(200).json(result);
         } catch (error) {
             console.error("Erro ao atualizar perfil:", error);

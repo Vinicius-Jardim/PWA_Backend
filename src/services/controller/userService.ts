@@ -29,6 +29,8 @@ export class UserService {
         const data = {
           name: userData.name,
           email: userData.email,
+          phone: userData.phone,
+          birthDate: userData.birthDate,
           athletes: userData.athletes,
           examSchedule: userData.examSchedule,
           avatarUrl: userData.avatarUrl,
@@ -39,6 +41,8 @@ export class UserService {
         const data = {
           name: userData.name,
           email: userData.email,
+          phone: userData.phone,
+          birthDate: userData.birthDate,
           role: userData.role,
           avatarUrl: userData.avatarUrl,
         };
@@ -188,62 +192,67 @@ export class UserService {
     name: string; 
     email: string;
     phone?: string;
-    birthDate?: Date;
+    birthDate?: string | null;
   }) {
     try {
-      const user = await User.findById(userId);
-      if (!user) {
+      console.log('[updateProfile] Received data:', JSON.stringify(data, null, 2));
+
+      // Validar data de nascimento
+      let birthDate = null;
+      if (data.birthDate) {
+        birthDate = new Date(data.birthDate);
+        if (isNaN(birthDate.getTime())) {
+          throw new Error('Data de nascimento inválida');
+        }
+      }
+
+      // Validar telefone
+      const phone = data.phone || '';
+      if (phone && !/^\d{9}$/.test(phone)) {
+        throw new Error('Telefone deve ter exatamente 9 dígitos');
+      }
+
+      // Preparar dados para atualização
+      const updateData = {
+        $set: {
+          name: data.name.trim(),
+          email: data.email.trim(),
+          phone: phone,
+          birthDate: birthDate
+        }
+      };
+
+      console.log('[updateProfile] Update data:', JSON.stringify(updateData, null, 2));
+
+      // Atualizar usuário usando findOneAndUpdate do mongoose
+      const result = await User.findOneAndUpdate(
+        { _id: userId },
+        updateData,
+        { 
+          new: true,  // Retorna o documento atualizado
+          runValidators: false  // Desabilita validações
+        }
+      ).lean();  // Converter para objeto JavaScript puro
+
+      if (!result) {
         throw new Error('Usuário não encontrado');
       }
 
-      // Atualizar os campos permitidos
-      user.name = data.name;
-      user.email = data.email;
-      if (data.phone) user.phone = data.phone;
-      if (data.birthDate) user.birthDate = new Date(data.birthDate);
+      console.log('[updateProfile] Updated user:', JSON.stringify(result, null, 2));
 
-      const updatedUser = await user.save();
-
-      // Retornar os dados baseado no papel do usuário
-      if (updatedUser.role === roles.ATHLETE) {
-        return {
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone,
-          birthDate: updatedUser.birthDate,
-          instructorId: updatedUser.instructorId,
-          belt: updatedUser.belt,
-          age: updatedUser.age,
-          joinedDate: updatedUser.joinedDate,
-          monthlyFee: updatedUser.monthlyFee,
-          gender: updatedUser.gender,
-          avatarUrl: updatedUser.avatarUrl,
-        };
-      }
-      if (updatedUser.role === roles.INSTRUCTOR) {
-        return {
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone,
-          birthDate: updatedUser.birthDate,
-          athletes: updatedUser.athletes,
-          examSchedule: updatedUser.examSchedule,
-          avatarUrl: updatedUser.avatarUrl,
-        };
-      }
-      if (updatedUser.role === roles.ADMIN) {
-        return {
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone,
-          birthDate: updatedUser.birthDate,
-          role: updatedUser.role,
-          avatarUrl: updatedUser.avatarUrl,
-        };
-      }
-      return updatedUser;
+      // Retornar dados atualizados
+      return {
+        name: result.name,
+        email: result.email,
+        phone: result.phone || '',
+        birthDate: result.birthDate,
+        instructorId: result.instructorId,
+        belt: result.belt,
+        joinedDate: result.joinedDate,
+        gender: result.gender
+      };
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
+      console.error('[updateProfile] Error:', error);
       throw error;
     }
   }

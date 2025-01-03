@@ -18,17 +18,18 @@ const setAuthCookie = (res: Response, token: string) => {
 
 export class AuthService {
   // Register for athletes
-  static async register(userData: {
-    name: string,
-    email: string,
-    password: string,
-    confirmPassword: string,
-    instructorId?: string,
-    birthDate?: string,
-    gender?: string
+  static async register(data: {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    birthDate?: string;
+    gender?: string;
+    instructorId?: string;
+    phone?: string;
   }) {
     try {
-      const { name, email, password, confirmPassword, instructorId, birthDate, gender } = userData;
+      const { name, email, password, confirmPassword, birthDate, gender, instructorId, phone } = data;
 
       // Check required fields
       if (!name || !email || !password) {
@@ -73,6 +74,7 @@ export class AuthService {
         instructorId: instructor?._id,
         birthDate: birthDate ? new Date(birthDate) : undefined,
         gender,
+        phone,
         belt: "WHITE"
       });
 
@@ -97,36 +99,27 @@ export class AuthService {
 
   static async login(email: string, password: string, res: Response) {
     try {
-      const startTime = Date.now();
-
       if (!email || !password) {
-        return { message: "Email and password are required" };
+        throw new Error("Email and password are required");
       }
 
-      const findUserStart = Date.now();
       const user = await User.findOne({ email });
-
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        throw new Error("User not found");
       }
 
-      const comparePasswordStart = Date.now();
       const isMatch = await comparePassword(password, user.password);
-
       if (!isMatch) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        throw new Error("Invalid credentials");
       }
 
-      const createTokenStart = Date.now();
       const token = createToken(user);
-
-      const setCookieStart = Date.now();
       setAuthCookie(res, token.token);
 
       return token;
     } catch (error) {
-      console.error("Error during login:", error, { stack: error });
-      return { message: "An unexpected error occurred" };
+      console.error("Error during login:", error);
+      throw error;
     }
   }
 
