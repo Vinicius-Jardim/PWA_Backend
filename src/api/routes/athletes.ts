@@ -11,5 +11,6 @@ router.get('/all-with-fees', verifyToken, authorizeRole(roles.INSTRUCTOR), Athle
 router.put('/:athleteId/belt', verifyToken, authorizeRole(roles.INSTRUCTOR), AthleteController.updateBelt);
 router.put('/:athleteId/suspend', verifyToken, authorizeRole(roles.INSTRUCTOR), AthleteController.suspendAthlete);
 router.post('/:athleteId/send-payment-reminder', verifyToken, authorizeRole(roles.INSTRUCTOR), AthleteController.sendPaymentReminder);
+router.delete('/:athleteId', verifyToken, authorizeRole(roles.INSTRUCTOR), AthleteController.deleteAthlete);
 
 export default router;

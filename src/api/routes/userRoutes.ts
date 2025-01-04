@@ -15,7 +15,7 @@ router.post("/login-qr", AuthController.loginWithQR);
 
 // User data route
 router.get("/me", verifyToken, UserController.me);
-router.put("/update", verifyToken, UserController.updateProfile);  // Nova rota específica para atualização
+router.put("/update", verifyToken, UserController.updateProfile);  
 
 // Avatar upload route
 router.post("/avatar", verifyToken, upload.single('avatar'), UserController.uploadAvatar);

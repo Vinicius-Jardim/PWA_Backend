@@ -185,41 +185,58 @@ export const AthleteController = {
     try {
       const { athleteId } = req.params;
 
+      // Buscar atleta
       const athlete = await User.findById(athleteId);
-      if (!athlete || athlete.role !== roles.ATHLETE) {
-        return res.status(404).json({
-          message: "Atleta não encontrado"
-        });
+      if (!athlete) {
+        return res.status(404).json({ message: "Atleta não encontrado" });
       }
 
-      // Buscar mensalidade pendente
-      const pendingFee = await MonthlyFee.findOne({
-        userId: athlete._id,
-        status: { $ne: "paid" }
-      }).sort({ dueDate: 1 });
+      // Enviar email
+      await sendEmail(
+        athlete.email,
+        "Lembrete de Pagamento",
+        "Olá, este é um lembrete amigável de que você tem um pagamento pendente."
+      );
 
-      if (!pendingFee) {
-        return res.status(404).json({
-          message: "Nenhuma mensalidade pendente encontrada"
-        });
-      }
-
-      // Enviar email de lembrete
-      await sendEmail({
-        to: athlete.email,
-        subject: "Lembrete de Pagamento",
-        text: `Olá ${athlete.name},\n\nEste é um lembrete sobre sua mensalidade pendente no valor de €${pendingFee.amount}, com vencimento em ${new Date(pendingFee.dueDate).toLocaleDateString()}.\n\nPor favor, regularize seu pagamento o mais breve possível.\n\nAtenciosamente,\nEquipe Academia`
-      });
-
-      res.status(200).json({
-        message: "Lembrete enviado com sucesso"
-      });
+      res.status(200).json({ message: "Lembrete enviado com sucesso" });
     } catch (error) {
       console.error("Erro ao enviar lembrete:", error);
       res.status(500).json({
         message: "Erro ao enviar lembrete",
-        error: error instanceof Error ? error.message : error
+        error: error instanceof Error ? error.message : error,
       });
     }
-  }
+  },
+
+  // Deletar atleta
+  deleteAthlete: async (req: Request, res: Response) => {
+    try {
+      const { athleteId } = req.params;
+
+      // Verificar se o atleta existe
+      const athlete = await User.findById(athleteId);
+      if (!athlete) {
+        return res.status(404).json({ message: "Atleta não encontrado" });
+      }
+
+      // Verificar se é realmente um atleta
+      if (athlete.role !== roles.ATHLETE) {
+        return res.status(400).json({ message: "O usuário não é um atleta" });
+      }
+
+      // Deletar mensalidades associadas
+      await MonthlyFee.deleteMany({ userId: athleteId });
+
+      // Deletar o atleta
+      await User.findByIdAndDelete(athleteId);
+
+      res.status(200).json({ message: "Atleta deletado com sucesso" });
+    } catch (error) {
+      console.error("Erro ao deletar atleta:", error);
+      res.status(500).json({
+        message: "Erro ao deletar atleta",
+        error: error instanceof Error ? error.message : error,
+      });
+    }
+  },
 };
