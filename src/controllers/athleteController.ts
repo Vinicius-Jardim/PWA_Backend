@@ -39,8 +39,19 @@ export const AthleteController = {
         pageSize: parseInt(req.query.pageSize as string) || 10
       };
 
+      // Construir query de busca
+      const searchQuery = params.search ? {
+        $or: [
+          { name: { $regex: params.search, $options: 'i' } },
+          { email: { $regex: params.search, $options: 'i' } }
+        ]
+      } : {};
+
       // Buscar atletas
-      const athletes = await User.find({ role: roles.ATHLETE })
+      const athletes = await User.find({ 
+        role: roles.ATHLETE,
+        ...searchQuery
+      })
         .select('-payments')
         .skip((params.page - 1) * params.pageSize)
         .limit(params.pageSize)
@@ -73,7 +84,7 @@ export const AthleteController = {
       );
 
       // Contar total de atletas
-      const totalCount = await User.countDocuments({ role: roles.ATHLETE });
+      const totalCount = await User.countDocuments({ role: roles.ATHLETE, ...searchQuery });
 
       // Enviar resposta
       res.status(200).json({
