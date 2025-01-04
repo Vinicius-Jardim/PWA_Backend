@@ -3,36 +3,40 @@ import { belts } from "./userModel";
 
 // Interface para o modelo Exam
 export interface IExam extends Document {
-  name: string; // Nome do exame
-  date: Date; // Data do exame
-  location: string; // Local do exame
-  maxParticipants: number; // Limite máximo de participantes
-  participants: mongoose.Types.ObjectId[]; // IDs dos atletas inscritos
-  beltLevel: string[]; // Faixas que serão avaliadas no exame
-  description?: string; // Descrição opcional do exame
-  createdBy: mongoose.Types.ObjectId; // ID do instrutor que criou o exame
-  instructor: mongoose.Types.ObjectId; // ID do instrutor responsável pelo exame
+  name: string;
+  beltLevel: string[];
+  description?: string;
+  createdBy: mongoose.Types.ObjectId;
+  instructor: mongoose.Types.ObjectId;
+  sessions: Array<{
+    date: Date;
+    time: string;
+    location: string;
+    maxParticipants: number;
+    participants: mongoose.Types.ObjectId[];
+  }>;
   results?: Array<{
     athleteId: mongoose.Types.ObjectId;
     grade: string;
     observations?: string;
-  }>; // Resultados dos atletas
+  }>;
 }
 
 // Schema do Exam
 const ExamSchema: Schema = new Schema<IExam>(
   {
-    name: { type: String, required: true },
-    date: { type: Date, required: true },
-    location: { type: String }, // Removido required
-    maxParticipants: { type: Number, required: true, default: 10 },
-    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    name: { 
+      type: String, 
+      required: true 
+    },
     beltLevel: [{ 
       type: String,
       enum: ["WHITE", "YELLOW", "ORANGE", "GREEN", "BLUE", "BROWN", "BLACK"],
       required: true 
     }],
-    description: { type: String },
+    description: { 
+      type: String 
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -41,8 +45,31 @@ const ExamSchema: Schema = new Schema<IExam>(
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: false, // Agora é opcional
+      required: false,
     },
+    sessions: [{
+      date: { 
+        type: Date, 
+        required: true 
+      },
+      time: { 
+        type: String, 
+        required: true 
+      },
+      location: { 
+        type: String, 
+        required: true 
+      },
+      maxParticipants: { 
+        type: Number, 
+        required: true, 
+        default: 10 
+      },
+      participants: [{ 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: "User" 
+      }]
+    }],
     results: [{
       athleteId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -61,10 +88,14 @@ const ExamSchema: Schema = new Schema<IExam>(
   }
 );
 
-// Middleware para validar o número máximo de participantes
+// Middleware para validar o número máximo de participantes em cada sessão
 ExamSchema.pre('save', async function(next) {
-  if (this.participants && this.participants.length > this.maxParticipants) {
-    throw new Error('Número máximo de participantes excedido');
+  if (this.sessions) {
+    for (const session of this.sessions) {
+      if (session.participants && session.participants.length > session.maxParticipants) {
+        throw new Error('Número máximo de participantes excedido em uma sessão');
+      }
+    }
   }
   next();
 });
