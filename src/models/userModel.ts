@@ -44,6 +44,8 @@ export interface IUser extends Document {
   avatarUrl?: string;
   suspended?: boolean;
   credentialNumber?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -143,10 +145,25 @@ const UserSchema: Schema = new Schema(
       date: { type: Date, default: Date.now }
     }],
     qrCode: { type: String },
-    avatarUrl: { type: String }
+    avatarUrl: { type: String },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
   },
   { timestamps: true }
 );
+
+// Middleware to hash password before saving
+UserSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    try {
+      // Implementar a lógica para criar o hash da senha
+      // this.password = await createPassword(this.password);
+    } catch (error) {
+      return next(error as Error);
+    }
+  }
+  next();
+});
 
 // Método para verificar permissões
 UserSchema.methods.hasPermission = function (

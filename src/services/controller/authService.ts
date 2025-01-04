@@ -182,4 +182,69 @@ export class AuthService {
       throw error;
     }
   }
+
+  static async changePassword(userId: Schema.Types.ObjectId, oldPassword: string, newPassword: string) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      const isPasswordValid = await comparePassword(oldPassword, user.password);
+      if (!isPasswordValid) {
+        throw new Error("Current password is incorrect");
+      }
+
+      const hashedPassword = await createPassword(newPassword);
+      user.password = hashedPassword;
+      await user.save();
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async forgotPassword(email: string) {
+    try {
+      const user = await User.findOne({ email });
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      const resetToken = jwt.sign(
+        { userId: user._id },
+        config.secretKey,
+        { expiresIn: config.resetTokenExpires }
+      );
+
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+      await user.save();
+
+      // Enviar email com o token de reset
+      await sendResetPasswordEmail(email, resetToken);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    try {
+      const user = await User.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() },
+      });
+
+      if (!user) {
+        throw new Error("Invalid or expired password reset token");
+      }
+
+      const hashedPassword = await createPassword(newPassword);
+      user.password = hashedPassword;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
+    } catch (error) {
+      throw error;
+    }
+  }
 }

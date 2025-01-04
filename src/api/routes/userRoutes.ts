@@ -13,6 +13,11 @@ router.post("/register", AuthController.register);
 router.post("/login", AuthController.login);
 router.post("/login-qr", AuthController.loginWithQR);
 
+// Password management routes
+router.post("/password/change", verifyToken, AuthController.changePassword);
+router.post("/password/forgot", AuthController.forgotPassword);
+router.post("/password/reset", AuthController.resetPassword);
+
 // User data route
 router.get("/me", verifyToken, UserController.me);
 router.put("/update", verifyToken, UserController.updateProfile);  
