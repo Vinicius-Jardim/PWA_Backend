@@ -176,19 +176,50 @@ export const MonthlyPlanController = {
         return res.status(403).json({ message: 'Acesso não autorizado' });
       }
 
-      const fee = await MonthlyFee.findById(feeId);
+      const fee = await MonthlyFee.findByIdAndUpdate(
+        feeId,
+        { status: 'active' },
+        { new: true }
+      );
+
       if (!fee) {
-        return res.status(404).json({ message: 'Solicitação não encontrada' });
+        return res.status(404).json({ message: 'Mensalidade não encontrada' });
       }
 
-      // Atualiza o status da mensalidade para pago
-      fee.status = 'paid';
-      fee.paidAt = new Date();
-      await fee.save();
-
-      res.json({ message: 'Solicitação aceita com sucesso' });
+      res.json(fee);
     } catch (error) {
       res.status(500).json({ message: error.message });
+    }
+  },
+
+  delete: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Verifica se existem mensalidades ativas ou pendentes vinculadas ao plano
+      const existingFees = await MonthlyFee.findOne({
+        planId: id,
+        status: { $in: ['active', 'pending'] }
+      });
+
+      if (existingFees) {
+        return res.status(400).json({ 
+          message: 'Não é possível excluir um plano que possui mensalidades ativas ou pendentes' 
+        });
+      }
+
+      const plan = await MonthlyPlan.findByIdAndDelete(id);
+      
+      if (!plan) {
+        return res.status(404).json({ message: "Plano não encontrado" });
+      }
+      
+      res.status(200).json({ message: "Plano excluído com sucesso" });
+    } catch (error) {
+      console.error("Erro ao excluir plano:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Erro ao excluir plano" 
+      });
     }
   }
 };
