@@ -3,6 +3,7 @@ import User, { roles, belts } from "../models/userModel";
 import { MonthlyFee } from "../models/monthlyFeeModel";
 import { AthleteService } from "../services/controller/atheleteService";
 import { sendEmail } from "../utils/emailService";
+import { ExamNotificationService } from "../services/examNotificationService";
 
 export const AthleteController = {
   // Listar atletas com paginação
@@ -106,29 +107,28 @@ export const AthleteController = {
   updateBelt: async (req: Request, res: Response) => {
     try {
       const { athleteId } = req.params;
-      const { belt } = req.body;
+      const { belt: newBelt } = req.body;
 
       // Verificar se a faixa é válida
-      if (!Object.values(belts).includes(belt)) {
+      if (!Object.values(belts).includes(newBelt)) {
         return res.status(400).json({
           message: "Faixa inválida. Faixas válidas: " + Object.values(belts).join(", ")
         });
       }
 
       // Atualizar a faixa do atleta
-      const athlete = await User.findById(athleteId);
-      if (!athlete || athlete.role !== roles.ATHLETE) {
-        return res.status(404).json({
-          message: "Atleta não encontrado"
-        });
-      }
+      const updatedAthlete = await User.findByIdAndUpdate(
+        athleteId,
+        { belt: newBelt },
+        { new: true }
+      );
 
-      athlete.belt = belt;
-      await athlete.save();
+      // Verificar e notificar sobre exames elegíveis
+      await ExamNotificationService.checkAndNotifyEligibleExams(athleteId, newBelt);
 
       res.status(200).json({
         message: "Faixa atualizada com sucesso",
-        athlete
+        athlete: updatedAthlete
       });
     } catch (error) {
       console.error("Erro ao atualizar faixa:", error);
