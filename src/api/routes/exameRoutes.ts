@@ -27,7 +27,7 @@ router.put("/:examId/sessions/:sessionId", verifyToken, authorizeRole(roles.INST
 router.delete("/:examId/sessions/:sessionId", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.deleteSession);
 
 // Rotas de resultados
-router.post("/result", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.updateResult);
+router.post("/:examId/result/:athleteId", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.updateResult);
 router.get("/:id/participants", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.getParticipants);
 router.post("/:examId/updateBelt/:athleteId", verifyToken, authorizeRole(roles.INSTRUCTOR), ExameController.updateBelt);
 

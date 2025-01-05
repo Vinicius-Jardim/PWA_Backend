@@ -248,50 +248,44 @@ export class ExameController {
   static async updateResult(req: Request, res: Response) {
     try {
       const { examId, athleteId } = req.params;
-      const { grade, finalBelt, observations } = req.body;
+      const { grade, observations } = req.body;
 
-      const exam = await Exam.findOne({
-        _id: examId,
-        instructor: req.user.id,
-        "sessions.participants": athleteId
-      });
-
+      // Buscar o exame
+      const exam = await Exam.findById(examId);
       if (!exam) {
-        return res.status(404).json({ message: "Exame não encontrado ou atleta não inscrito" });
+        return res.status(404).json({ message: "Exame não encontrado" });
       }
 
-      // Verifica se o atleta está inscrito em alguma sessão
+      // Verificar se o atleta está inscrito em alguma sessão
       const isParticipant = exam.sessions.some(session => 
-        session.participants.includes(athleteId)
+        session.participants.some(p => p.toString() === athleteId)
       );
 
       if (!isParticipant) {
-        return res.status(400).json({ message: "Atleta não está inscrito neste exame" });
+        return res.status(404).json({ message: "Atleta não inscrito neste exame" });
       }
 
-      // Encontra o resultado existente ou cria um novo
-      const existingResultIndex = exam.results?.findIndex(
-        result => result.athleteId.toString() === athleteId
-      );
+      // Verificar se já existe um resultado para este atleta
+      const existingResult = exam.results?.find(r => r.athleteId.toString() === athleteId);
+      if (existingResult) {
+        return res.status(400).json({ message: "Já existe um resultado registrado para este atleta" });
+      }
 
-      const resultData = {
-        athleteId,
-        grade,
-        finalBelt,
+      // Adicionar o resultado
+      if (!exam.results) {
+        exam.results = [];
+      }
+
+      exam.results.push({
+        athleteId: new mongoose.Types.ObjectId(athleteId),
+        grade: Number(grade),
         observations
-      };
+      });
 
-      if (existingResultIndex !== undefined && existingResultIndex >= 0) {
-        exam.results[existingResultIndex] = resultData;
-      } else {
-        if (!exam.results) exam.results = [];
-        exam.results.push(resultData);
-      }
+      await exam.save();
 
-      await exam.save(); // Isso irá acionar o middleware que atualiza a faixa do atleta
-
-      res.json({ message: "Resultado atualizado com sucesso" });
-    } catch (error: any) {
+      res.json({ message: "Resultado registrado com sucesso" });
+    } catch (error) {
       console.error('Erro ao atualizar resultado:', error);
       res.status(500).json({ message: "Erro ao atualizar resultado", error: error.message });
     }
@@ -334,15 +328,20 @@ export class ExameController {
   static async updateBelt(req: Request, res: Response) {
     try {
       const { examId, athleteId } = req.params;
-      const { newBelt } = req.body;
 
-      const exam = await Exam.findOne({
-        _id: examId,
-        instructor: req.user.id
-      });
-
+      const exam = await Exam.findById(examId);
       if (!exam) {
         return res.status(404).json({ message: "Exame não encontrado" });
+      }
+
+      // Verificar se o atleta tem resultado e se foi aprovado
+      const result = exam.results?.find(r => r.athleteId.toString() === athleteId);
+      if (!result) {
+        return res.status(400).json({ message: "Atleta não tem resultado registrado" });
+      }
+
+      if (result.grade < 7) {
+        return res.status(400).json({ message: "Atleta não foi aprovado" });
       }
 
       const athlete = await User.findById(athleteId);
@@ -350,11 +349,18 @@ export class ExameController {
         return res.status(404).json({ message: "Atleta não encontrado" });
       }
 
+      // Pegar a última faixa do array beltLevel (que é a faixa alvo)
+      const newBelt = exam.beltLevel[exam.beltLevel.length - 1];
+      if (!newBelt) {
+        return res.status(400).json({ message: "Faixa alvo não encontrada no exame" });
+      }
+
       athlete.belt = newBelt;
       await athlete.save();
 
-      res.json({ message: "Faixa atualizada com sucesso" });
+      res.json({ message: "Faixa atualizada com sucesso", newBelt });
     } catch (error) {
+      console.error('Erro ao atualizar faixa:', error);
       res.status(500).json({ message: "Erro ao atualizar faixa" });
     }
   }
