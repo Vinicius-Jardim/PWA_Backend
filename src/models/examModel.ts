@@ -5,6 +5,7 @@ import { belts } from "./userModel";
 export interface IExam extends Document {
   name: string;
   beltLevel: string[];
+  finalBelt: string; // Faixa para qual os atletas serão promovidos se aprovados
   description?: string;
   createdBy: mongoose.Types.ObjectId;
   instructor: mongoose.Types.ObjectId;
@@ -17,7 +18,7 @@ export interface IExam extends Document {
   }>;
   results?: Array<{
     athleteId: mongoose.Types.ObjectId;
-    grade: string;
+    grade: number;
     observations?: string;
   }>;
 }
@@ -34,6 +35,11 @@ const ExamSchema: Schema = new Schema<IExam>(
       enum: ["WHITE", "YELLOW", "ORANGE", "GREEN", "BLUE", "BROWN", "BLACK"],
       required: true 
     }],
+    finalBelt: {
+      type: String,
+      enum: ["YELLOW", "ORANGE", "GREEN", "BLUE", "BROWN", "BLACK"],
+      required: true
+    },
     description: { 
       type: String 
     },
@@ -77,8 +83,10 @@ const ExamSchema: Schema = new Schema<IExam>(
         required: true
       },
       grade: {
-        type: String,
-        required: true
+        type: Number,
+        required: true,
+        min: 0,
+        max: 10
       },
       observations: String
     }]
@@ -100,7 +108,22 @@ ExamSchema.pre('save', async function(next) {
   next();
 });
 
-// Exportação do modelo
+// Middleware para atualizar a faixa do atleta quando aprovado
+ExamSchema.post('save', async function(doc) {
+  const User = mongoose.model('User');
+  
+  if (doc.results && doc.results.length > 0) {
+    for (const result of doc.results) {
+      if (result.grade >= 7) { // Se a nota for maior ou igual a 7, atleta é aprovado
+        await User.findByIdAndUpdate(
+          result.athleteId,
+          { belt: doc.finalBelt },
+          { new: true }
+        );
+      }
+    }
+  }
+});
+
 const Exam = model<IExam>("Exam", ExamSchema);
-export default Exam;
 export { Exam };

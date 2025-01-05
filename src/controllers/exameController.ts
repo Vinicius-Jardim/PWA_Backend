@@ -247,62 +247,86 @@ export class ExameController {
   // Métodos de Resultado
   static async updateResult(req: Request, res: Response) {
     try {
-      const { examId, athleteId, grade, observations } = req.body;
+      const { examId, athleteId } = req.params;
+      const { grade, finalBelt, observations } = req.body;
 
       const exam = await Exam.findOne({
         _id: examId,
-        instructor: req.user.id
+        instructor: req.user.id,
+        "sessions.participants": athleteId
       });
 
       if (!exam) {
-        return res.status(404).json({ message: "Exame não encontrado" });
+        return res.status(404).json({ message: "Exame não encontrado ou atleta não inscrito" });
       }
 
-      const result = {
+      // Verifica se o atleta está inscrito em alguma sessão
+      const isParticipant = exam.sessions.some(session => 
+        session.participants.includes(athleteId)
+      );
+
+      if (!isParticipant) {
+        return res.status(400).json({ message: "Atleta não está inscrito neste exame" });
+      }
+
+      // Encontra o resultado existente ou cria um novo
+      const existingResultIndex = exam.results?.findIndex(
+        result => result.athleteId.toString() === athleteId
+      );
+
+      const resultData = {
         athleteId,
         grade,
+        finalBelt,
         observations
       };
 
-      const existingResultIndex = exam.results.findIndex(
-        r => r.athleteId.toString() === athleteId
-      );
-
-      if (existingResultIndex >= 0) {
-        exam.results[existingResultIndex] = result;
+      if (existingResultIndex !== undefined && existingResultIndex >= 0) {
+        exam.results[existingResultIndex] = resultData;
       } else {
-        exam.results.push(result);
+        if (!exam.results) exam.results = [];
+        exam.results.push(resultData);
       }
 
-      await exam.save();
-      res.json(exam);
-    } catch (error) {
-      res.status(500).json({ message: "Erro ao atualizar resultado" });
+      await exam.save(); // Isso irá acionar o middleware que atualiza a faixa do atleta
+
+      res.json({ message: "Resultado atualizado com sucesso" });
+    } catch (error: any) {
+      console.error('Erro ao atualizar resultado:', error);
+      res.status(500).json({ message: "Erro ao atualizar resultado", error: error.message });
     }
   }
 
   static async getParticipants(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const exam = await Exam.findOne({
-        _id: id,
-        instructor: req.user.id
-      });
+      
+      // Buscar o exame com populate no instructor
+      const exam = await Exam.findById(id).populate('instructor');
 
       if (!exam) {
         return res.status(404).json({ message: "Exame não encontrado" });
       }
 
-      const participantIds = exam.sessions.reduce((ids, session) => {
-        return [...ids, ...session.participants];
-      }, []);
+      // Coleta todos os IDs únicos de participantes de todas as sessões
+      const participantIds = Array.from(new Set(
+        exam.sessions.reduce((ids: string[], session) => {
+          return [...ids, ...session.participants.map(p => p.toString())];
+        }, [])
+      ));
 
-      const participants = await User.find({
-        _id: { $in: participantIds }
+      if (participantIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Buscar usuários pelo ID
+      const users = await mongoose.model('User').find({
+        _id: { $in: participantIds.map(id => new mongoose.Types.ObjectId(id)) }
       }).select("name email belt");
 
-      res.json(participants);
+      res.json(users);
     } catch (error) {
+      console.error("Erro ao buscar participantes:", error);
       res.status(500).json({ message: "Erro ao buscar participantes" });
     }
   }
