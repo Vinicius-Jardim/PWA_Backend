@@ -203,11 +203,11 @@ export const AthleteController = {
       }
 
       // Enviar email
-      await sendEmail(
-        athlete.email,
-        "Lembrete de Pagamento",
-        "Olá, este é um lembrete amigável de que você tem um pagamento pendente."
-      );
+      await sendEmail({
+        to: athlete.email,
+        subject: "Lembrete de Pagamento",
+        text: "Olá, este é um lembrete amigável de que você tem um pagamento pendente."
+      });
 
       res.status(200).json({ message: "Lembrete enviado com sucesso" });
     } catch (error) {
