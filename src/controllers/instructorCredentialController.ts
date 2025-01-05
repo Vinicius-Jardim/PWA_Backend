@@ -54,6 +54,21 @@ export const InstructorCredentialController = {
       res.status(200).json(result);
     } catch (error) {
       console.error("Error in getById controller:", error);
+      
+      if (error instanceof Error) {
+        if (error.message === "Credencial não encontrada") {
+          return res.status(404).json({
+            message: "Instructor credential not found",
+            error: error.message
+          });
+        } else if (error.message === "Não autorizado a ver esta credencial") {
+          return res.status(403).json({
+            message: "Not authorized to view this credential",
+            error: error.message
+          });
+        }
+      }
+      
       res.status(500).json({
         message: "Error fetching instructor credential",
         error: error instanceof Error ? error.message : String(error),

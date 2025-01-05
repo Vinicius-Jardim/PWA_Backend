@@ -8,12 +8,12 @@ const status = {
 
 const monthlyFeeSchema = new mongoose.Schema(
   {
-    student: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
+      ref: "User",
       required: true,
     },
-    plan: {
+    planId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "MonthlyPlan",
       required: true,
@@ -25,8 +25,9 @@ const monthlyFeeSchema = new mongoose.Schema(
     },
     dueDate: {
       type: Date,
+      required: true
     },
-    paymentDate: {
+    paidAt: {
       type: Date,
     },
     status: {
@@ -36,7 +37,7 @@ const monthlyFeeSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: "cash",
+      enum: ["cash", "card", "transfer"],
       required: function (this: any) {
         return this.status === status.PAID;
       },
@@ -50,10 +51,11 @@ const monthlyFeeSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    collection: "MonthlyFees",
   }
 );
 
-const MonthlyFee = mongoose.model("MonthlyFee", monthlyFeeSchema);
+// Índices para melhorar a performance das consultas
+monthlyFeeSchema.index({ userId: 1, dueDate: -1 });
+monthlyFeeSchema.index({ status: 1 });
 
-export { MonthlyFee, status };
+export const MonthlyFee = mongoose.model("MonthlyFee", monthlyFeeSchema);

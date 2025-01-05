@@ -12,6 +12,28 @@ export const UserController = {
         }
     },
 
+    updateProfile: async (req: Request, res: Response): Promise<void> => {
+        try {
+            const userId = req.user.id;
+            const { name, email, phone, birthDate } = req.body;
+            
+            console.log('[updateProfile] Request body:', JSON.stringify(req.body, null, 2));
+            
+            const result = await UserService.updateProfile(userId, { 
+                name, 
+                email,
+                phone,
+                birthDate
+            });
+            res.status(200).json(result);
+        } catch (error) {
+            console.error("Erro ao atualizar perfil:", error);
+            res.status(400).json({
+                message: error instanceof Error ? error.message : "Erro ao atualizar perfil"
+            });
+        }
+    },
+
     updateAthleteBelt: async (req: Request, res: Response) => {
         try {
             const { athleteId } = req.params;
@@ -40,6 +62,29 @@ export const UserController = {
             console.error("Erro ao buscar atletas:", error);
             res.status(400).json({
                 message: error instanceof Error ? error.message : "Erro ao buscar atletas"
+            });
+        }
+    },
+
+    uploadAvatar: async (req: Request, res: Response): Promise<void> => {
+        try {
+            if (!req.file) {
+                res.status(400).json({ message: "Nenhuma imagem foi enviada" });
+                return;
+            }
+
+            const userId = req.user.id;
+            const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+            const result = await UserService.updateAvatar(userId, avatarUrl);
+            
+            res.status(200).json({ 
+                message: "Avatar atualizado com sucesso",
+                avatarUrl 
+            });
+        } catch (error) {
+            res.status(500).json({
+                message: error instanceof Error ? error.message : "Erro ao fazer upload do avatar"
             });
         }
     }

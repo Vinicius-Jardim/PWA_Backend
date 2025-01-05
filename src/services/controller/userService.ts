@@ -1,5 +1,7 @@
 import { roles, belts } from "../../models/userModel";
 import User from "../../models/userModel";
+import path from 'path';
+import fs from 'fs';
 
 export class UserService {
   static async me(user: any) {
@@ -14,10 +16,12 @@ export class UserService {
           email: userData.email,
           instructorId: userData.instructorId,
           belt: userData.belt,
-          age: userData.age,
+          birthDate: userData.birthDate,
+          phone: userData.phone,
           joinedDate: userData.joinedDate,
           monthlyFee: userData.monthlyFee,
           gender: userData.gender,
+          avatarUrl: userData.avatarUrl,
         };
         return data;
       }
@@ -25,8 +29,11 @@ export class UserService {
         const data = {
           name: userData.name,
           email: userData.email,
+          phone: userData.phone,
+          birthDate: userData.birthDate,
           athletes: userData.athletes,
           examSchedule: userData.examSchedule,
+          avatarUrl: userData.avatarUrl,
         };
         return data;
       }
@@ -34,7 +41,10 @@ export class UserService {
         const data = {
           name: userData.name,
           email: userData.email,
+          phone: userData.phone,
+          birthDate: userData.birthDate,
           role: userData.role,
+          avatarUrl: userData.avatarUrl,
         };
         return data;
       }
@@ -42,6 +52,31 @@ export class UserService {
     } catch (error) {
       console.error("Error fetching user data:", error, { stack: error });
       return { message: "An unexpected error occurred" };
+    }
+  }
+
+  static async updateBelt(userId: string, belt: string) {
+    try {
+      // Validar se a faixa é válida
+      if (!Object.values(belts).includes(belt)) {
+        throw new Error('Faixa inválida');
+      }
+
+      // Atualizar a faixa do atleta
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { belt },
+        { new: true }
+      );
+
+      if (!updatedUser) {
+        throw new Error('Usuário não encontrado');
+      }
+
+      return updatedUser;
+    } catch (error) {
+      console.error('Erro ao atualizar faixa:', error);
+      throw error;
     }
   }
 
@@ -125,6 +160,91 @@ export class UserService {
       };
     } catch (error) {
       console.error("Erro ao buscar atletas:", error);
+      throw error;
+    }
+  }
+
+  static async updateAvatar(userId: string, avatarUrl: string) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new Error("Usuário não encontrado");
+      }
+
+      // Remove old avatar file if exists
+      if (user.avatarUrl) {
+        const oldAvatarPath = path.join(__dirname, '../../../', user.avatarUrl);
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+
+      user.avatarUrl = avatarUrl;
+      await user.save();
+      return user;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async updateProfile(userId: string, data: { 
+    name: string; 
+    email: string;
+    phone?: string;
+    birthDate?: string | null;
+  }) {
+    try {
+      // Validar data de nascimento
+      let birthDate = null;
+      if (data.birthDate) {
+        birthDate = new Date(data.birthDate);
+        if (isNaN(birthDate.getTime())) {
+          throw new Error('Data de nascimento inválida');
+        }
+      }
+
+      // Validar telefone
+      const phone = data.phone || '';
+      if (phone && !/^\d{9}$/.test(phone)) {
+        throw new Error('Telefone deve ter exatamente 9 dígitos');
+      }
+
+      // Preparar dados para atualização
+      const updateData = {
+        $set: {
+          name: data.name.trim(),
+          email: data.email.trim(),
+          phone: phone,
+          birthDate: birthDate
+        }
+      };
+
+      // Atualizar usuário usando findOneAndUpdate do mongoose
+      const result = await User.findOneAndUpdate(
+        { _id: userId },
+        updateData,
+        { 
+          new: true,  // Retorna o documento atualizado
+          runValidators: false  // Desabilita validações
+        }
+      ).lean();  // Converter para objeto JavaScript puro
+
+      if (!result) {
+        throw new Error('Usuário não encontrado');
+      }
+
+      // Retornar dados atualizados
+      return {
+        name: result.name,
+        email: result.email,
+        phone: result.phone || '',
+        birthDate: result.birthDate,
+        instructorId: result.instructorId,
+        belt: result.belt,
+        joinedDate: result.joinedDate,
+        gender: result.gender
+      };
+    } catch (error) {
       throw error;
     }
   }

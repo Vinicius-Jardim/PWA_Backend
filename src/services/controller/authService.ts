@@ -1,148 +1,136 @@
 import User, { IUser } from "../../models/userModel";
-import Credential from "../../models/instructorCredential";
 import { comparePassword, createPassword } from "../../utils/passwordUtil";
 import { roles, RoleType } from "../../models/userModel";
-import { createToken } from "../../utils/tokenUtil";
+import { createToken, createTokenPasswordReset } from "../../utils/tokenUtil";
+import { sendEmail } from "../../utils/emailService";
 import jwt from "jsonwebtoken";
 import { Response } from "express";
 import { Schema } from "mongoose";
 import { config } from "../../config";
 
-// Função para definir o cookie de autenticação
+// Function to set authentication cookie
 const setAuthCookie = (res: Response, token: string) => {
   res.cookie("token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 24 * 60 * 60 * 1000, // 1 dia
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
   });
 };
 
 export class AuthService {
-  static async register(
-    name: string,
-    email: string,
-    password: string,
-    instructorId: string | null,
-    confirmPassword: string
-  ) {
+  // Register for athletes
+  static async register(data: {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    birthDate?: string;
+    gender?: string;
+    instructorId?: string;
+    phone?: string;
+  }) {
     try {
-      // Verificar campos obrigatórios
+      const { name, email, password, confirmPassword, birthDate, gender, instructorId, phone } = data;
+
+      // Check required fields
       if (!name || !email || !password) {
-        return { message: "Name, email, and password are required" };
+        throw new Error("Name, email, and password are required");
       }
 
-      // Verificar se o usuário já existe
+      // Check if user already exists
       const existingUser = await User.findOne({ email });
       if (existingUser) {
-        return { message: "User already exists" };
+        throw new Error("User already exists");
       }
 
-      // Verificar se as senhas coincidem
+      // Check if passwords match
       if (password !== confirmPassword) {
-        return { message: "Passwords do not match" };
+        throw new Error("Passwords do not match");
       }
 
-      // Criar o hash da senha
+      // If instructorId provided, validate and get instructor
+      let instructor;
+      if (instructorId) {
+        instructor = await User.findById(instructorId);
+        if (!instructor || instructor.role !== roles.INSTRUCTOR) {
+          throw new Error("Instructor not found");
+        }
+
+        // Check if instructor has reached max students (10)
+        const athleteCount = await User.countDocuments({ instructorId: instructor._id });
+        if (athleteCount >= 10) {
+          throw new Error("This instructor has reached the maximum number of students");
+        }
+      }
+
+      // Create password hash
       const hashPassword = await createPassword(password);
 
-      // Inicializar os dados básicos do novo usuário
-      let newUserData: Partial<IUser> = {
+      // Create user as ATHLETE
+      const newUser = new User({
         name,
         email,
         password: hashPassword,
-        role: roles.ATHLETE, // Valor padrão: "ATHLETE"
-      };
+        role: roles.ATHLETE,
+        instructorId: instructor?._id,
+        birthDate: birthDate ? new Date(birthDate) : undefined,
+        gender,
+        phone,
+        belt: "WHITE"
+      });
 
-      // Caso o `instructorId` seja fornecido, configurar como "INSTRUCTOR"
-      if (instructorId) {
-        const validateCredential = await Credential.findOne({
-          instructorId,
-          isUsed: false,
-        });
-
-        if (!validateCredential) {
-          return {
-            message: "Invalid instructor ID or credential already used",
-          };
-        }
-
-        // Atualizar credencial como usada
-        validateCredential.isUsed = true;
-        validateCredential.updatedAt = new Date();
-        await validateCredential.save();
-
-        // Atualizar papel para "INSTRUCTOR" e adicionar credenciais
-        newUserData = {
-          ...newUserData,
-          role: roles.INSTRUCTOR,
-        };
-
-        // Criar o usuário como "INSTRUCTOR"
-        const newUser = new User(newUserData);
-        await newUser.save();
-
-        validateCredential.user = newUser._id;
-        await validateCredential.save();
-
-        // Criar o token JWT para o instrutor
-        const token = createToken(newUser);
-        return token;
-      }
-
-      // Criar o usuário como "ATHLETE" sem atributos irrelevantes
-      const newUser = new User(newUserData);
       await newUser.save();
 
-      // Criar o token JWT para o atleta
+      // Create JWT token
       const token = createToken(newUser);
-      return token;
+      return { 
+        token, 
+        user: { 
+          id: newUser._id, 
+          name: newUser.name, 
+          email: newUser.email, 
+          role: newUser.role,
+          instructorId: newUser.instructorId 
+        } 
+      };
     } catch (error) {
-      console.error("Error during registration:", error, { stack: error });
-      return { message: "An unexpected error occurred" };
+      throw error;
     }
   }
 
   static async login(email: string, password: string, res: Response) {
     try {
-      const startTime = Date.now();
-
       if (!email || !password) {
-        return { message: "Email and password are required" };
+        throw new Error("Email and password are required");
       }
 
-      const findUserStart = Date.now();
       const user = await User.findOne({ email });
-
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        throw new Error("User not found");
       }
 
-      const comparePasswordStart = Date.now();
       const isMatch = await comparePassword(password, user.password);
-
       if (!isMatch) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        throw new Error("Invalid credentials");
       }
 
-      const createTokenStart = Date.now();
       const token = createToken(user);
-
-      const setCookieStart = Date.now();
       setAuthCookie(res, token.token);
 
       return token;
     } catch (error) {
-      console.error("Error during login:", error, { stack: error });
-      return { message: "An unexpected error occurred" };
+      console.error("Error during login:", error);
+      throw error;
     }
   }
+
   static async loginWithQR(qrCode: string, res: Response) {
     try {
       if (!qrCode) {
         throw new Error("QR code is required");
       }
 
-      // Decodificar o QR code
+      // Decode QR code
       let qrData;
       try {
         qrData = JSON.parse(qrCode);
@@ -154,7 +142,7 @@ export class AuthService {
         throw new Error("QR code missing token");
       }
 
-      // Extrair ID do token
+      // Extract ID from token
       const decodedToken = jwt.verify(
         qrData.token,
         process.env.SECRET_KEY || "supersecretkey"
@@ -165,21 +153,21 @@ export class AuthService {
         throw new Error("Token missing user ID");
       }
 
-      // Procurar usuário pelo ID do token
+      // Find user by token ID
       const user = await User.findById(userId);
 
       if (!user) {
         throw new Error("User not found");
       }
 
-      // Atualizar o QR code do usuário
+      // Update user's QR code
       user.qrCode = qrCode;
       await user.save();
 
-      // Criar token JWT
+      // Create JWT token
       const token = createToken(user);
 
-      // Definir cookie de autenticação
+      // Set authentication cookie
       setAuthCookie(res, token.token);
 
       return {
@@ -191,6 +179,73 @@ export class AuthService {
         },
         token: token.token,
       };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async changePassword(userId: Schema.Types.ObjectId, oldPassword: string, newPassword: string) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      const isPasswordValid = await comparePassword(oldPassword, user.password);
+      if (!isPasswordValid) {
+        throw new Error("Current password is incorrect");
+      }
+
+      const hashedPassword = await createPassword(newPassword);
+      user.password = hashedPassword;
+      await user.save();
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async forgotPassword(email: string) {
+    try {
+      const user = await User.findOne({ email });
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Gerar token de reset
+      const resetToken = createTokenPasswordReset(user);
+
+      // Salvar o token no usuário
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hora
+      await user.save();
+
+      // Enviar email
+      await sendEmail({
+        to: user.email,
+        subject: "Recuperação de Senha",
+        text: `Para redefinir sua senha, clique no link: http://localhost:3000/reset-password?token=${resetToken}`,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    try {
+      const user = await User.findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: Date.now() },
+      });
+
+      if (!user) {
+        throw new Error("Invalid or expired password reset token");
+      }
+
+      const hashedPassword = await createPassword(newPassword);
+      user.password = hashedPassword;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
     } catch (error) {
       throw error;
     }

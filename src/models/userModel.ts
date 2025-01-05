@@ -31,16 +31,21 @@ export interface IUser extends Document {
   password: string;
   role: keyof typeof roles;
   belt?: keyof typeof belts;
-  age?: number;
+  birthDate?: Date;
+  phone?: string;
   gender?: "male" | "female";
   monthlyFee?: number;
   joinedDate?: Date;
   instructorId?: Types.ObjectId;
   athletes?: Types.ObjectId[];
-  examSchedule?: { date: Date; location: string }[];
   payments?: { date: Date; amount: number; status: "paid" | "pending" }[];
   examResults?: { examId: Types.ObjectId; grade: string; date: Date }[];
   qrCode?: string;
+  avatarUrl?: string;
+  suspended?: boolean;
+  credentialNumber?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   hasPermission(requiredRole: keyof typeof roles): boolean;
 }
 
@@ -55,6 +60,18 @@ const UserSchema: Schema = new Schema(
       required: true,
       enum: Object.values(roles),
     },
+    credentialNumber: {
+      type: String,
+      validate: {
+        validator: function (v: string) {
+          return this.role !== roles.INSTRUCTOR || (v && v.length === 9 && /^\d+$/.test(v));
+        },
+        message: "Número de credencial deve ter exatamente 9 dígitos",
+      },
+      required: function (this: { role: string }) {
+        return this.role === roles.INSTRUCTOR;
+      },
+    },
     belt: {
       type: String,
       enum: Object.values(belts),
@@ -62,10 +79,28 @@ const UserSchema: Schema = new Schema(
         return this.role === roles.ATHLETE ? belts.WHITE : undefined;
       },
     },
-    age: { type: Number },
+    birthDate: { 
+      type: Date,
+      validate: {
+        validator: function(date: Date) {
+          return date <= new Date();
+        },
+        message: "Data de nascimento não pode ser no futuro"
+      }
+    },
+    phone: { 
+      type: String,
+      validate: {
+        validator: function(v: string) {
+          return /^\+?[\d\s-()]+$/.test(v);
+        },
+        message: "Formato de telefone inválido"
+      }
+    },
     gender: { type: String, enum: ["male", "female"] },
     monthlyFee: { type: Number },
     joinedDate: { type: Date, default: Date.now },
+    suspended: { type: Boolean, default: false },
     instructorId: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -81,88 +116,126 @@ const UserSchema: Schema = new Schema(
       ref: "User",
       validate: [
         {
-          validator: function (
-            this: { role: string },
-            athletes: Types.ObjectId[]
-          ) {
-            // Apenas INSTRUCTOR pode ter atletas associados
-            return this.role === roles.INSTRUCTOR || athletes.length === 0;
+          validator(this: { role: string }, value: Types.ObjectId[]) {
+            return !value || value.length === 0 || this.role === roles.INSTRUCTOR;
           },
           message: "Only INSTRUCTOR can have associated athletes.",
         },
         {
-          validator: function (athletes: Types.ObjectId[]) {
-            // Garantir que o número de atletas não exceda 10
-            return athletes.length <= 10;
+          validator(athletes: Types.ObjectId[]) {
+            return !athletes || athletes.length <= 10;
           },
           message: "An instructor can have at most 10 associated athletes.",
         },
       ],
-    },
-    examSchedule: [
-      {
-        date: Date,
-        location: String,
+      default(this: { role: string }) {
+        return this.role === roles.INSTRUCTOR ? [] : undefined;
       },
-    ],
+    },
     payments: [
       {
-        date: Date,
-        amount: Number,
+        date: { type: Date },
+        amount: { type: Number },
         status: { type: String, enum: ["paid", "pending"] },
       },
     ],
-    examResults: [
-      {
-        examId: { type: Schema.Types.ObjectId, ref: "Exam" },
-        grade: String,
-        date: Date,
-      },
-    ],
+    examResults: [{
+      examId: { type: Schema.Types.ObjectId, ref: 'Exam' },
+      grade: String,
+      date: { type: Date, default: Date.now }
+    }],
+    qrCode: { type: String },
+    avatarUrl: { type: String },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
+
+// Middleware to hash password before saving
+UserSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    try {
+      // Implementar a lógica para criar o hash da senha
+      // this.password = await createPassword(this.password);
+    } catch (error) {
+      return next(error as Error);
+    }
+  }
+  next();
+});
 
 // Método para verificar permissões
 UserSchema.methods.hasPermission = function (
   this: IUser,
   requiredRole: keyof typeof roles
-) {
-  return roleHierarchy[this.role] >= roleHierarchy[requiredRole];
+): boolean {
+  const userRoleLevel = roleHierarchy[this.role];
+  const requiredRoleLevel = roleHierarchy[requiredRole];
+  return userRoleLevel >= requiredRoleLevel;
 };
 
 // Middleware para limpar campos específicos
 UserSchema.pre("save", function (next) {
   const user = this as IUser;
 
-  // Limpar atributos específicos com base no papel do usuário
+  // Limpar campos baseado no papel do usuário
   if (user.role === roles.ATHLETE) {
-    // Garantir que atributos de atleta estejam presentes
+    user.credentialNumber = undefined;
     user.athletes = undefined;
-  } else {
-    // Limpar campos exclusivos de ATHLETE para outros papéis
-    user.examSchedule = undefined;
-    user.payments = undefined;
-    user.examResults = undefined;
-  }
-
-  if (user.role === roles.INSTRUCTOR) {
-    // Remover instructorId se o papel for INSTRUCTOR
+  } else if (user.role === roles.INSTRUCTOR) {
+    user.belt = undefined;
+    user.monthlyFee = undefined;
     user.instructorId = undefined;
-  }
-
-  // Garantir que outros papéis não possuam campos extras
-  if (user.role !== roles.INSTRUCTOR && user.role !== roles.ATHLETE) {
-    user.athletes = undefined;
-    user.instructorId = undefined;
+    user.birthDate = undefined;
   }
 
   next();
 });
 
-const User = mongoose.model<IUser>("User", UserSchema);
-export default User;
-export type RoleType = keyof typeof roles;
-export type BeltType = keyof typeof belts;
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *         - password
+ *         - role
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Auto-generated MongoDB ID
+ *         name:
+ *           type: string
+ *           description: User's full name
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address
+ *         password:
+ *           type: string
+ *           description: User's hashed password
+ *         role:
+ *           type: string
+ *           enum: [ATHLETE, INSTRUCTOR, ADMIN]
+ *           description: User's role in the system
+ *         belt:
+ *           type: string
+ *           enum: [WHITE, YELLOW, ORANGE, GREEN, BLUE, BROWN, BLACK]
+ *           description: User's current belt level (for athletes)
+ *         birthDate:
+ *           type: string
+ *           format: date
+ *           description: User's date of birth
+ *         suspended:
+ *           type: boolean
+ *           description: Whether the user is suspended
+ *         avatarUrl:
+ *           type: string
+ *           description: URL to user's avatar image
+ */
+
+export default mongoose.model<IUser>("User", UserSchema);
