@@ -1,7 +1,8 @@
 import User, { IUser } from "../../models/userModel";
 import { comparePassword, createPassword } from "../../utils/passwordUtil";
 import { roles, RoleType } from "../../models/userModel";
-import { createToken } from "../../utils/tokenUtil";
+import { createToken, createTokenPasswordReset } from "../../utils/tokenUtil";
+import { sendEmail } from "../../utils/emailService";
 import jwt from "jsonwebtoken";
 import { Response } from "express";
 import { Schema } from "mongoose";
@@ -210,18 +211,20 @@ export class AuthService {
         throw new Error("User not found");
       }
 
-      const resetToken = jwt.sign(
-        { userId: user._id },
-        config.secretKey,
-        { expiresIn: config.resetTokenExpires }
-      );
+      // Gerar token de reset
+      const resetToken = createTokenPasswordReset(user);
 
+      // Salvar o token no usuário
       user.resetPasswordToken = resetToken;
-      user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+      user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hora
       await user.save();
 
-      // Enviar email com o token de reset
-      await sendResetPasswordEmail(email, resetToken);
+      // Enviar email
+      await sendEmail({
+        to: user.email,
+        subject: "Recuperação de Senha",
+        text: `Para redefinir sua senha, clique no link: http://localhost:3000/reset-password?token=${resetToken}`,
+      });
     } catch (error) {
       throw error;
     }

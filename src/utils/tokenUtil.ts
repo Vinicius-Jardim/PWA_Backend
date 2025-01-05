@@ -60,7 +60,7 @@ const createToken = (user: UserDocument): { token: string } => {
 // Tipagem para o token de reset de senha
 const createTokenPasswordReset = (user: UserDocument): string => {
   return jwt.sign(
-    { id: user._id, role: user.role },
+    { id: user._id },
     config.secretKey,
     { expiresIn: '1h' }
   );
