@@ -193,4 +193,49 @@ UserSchema.pre("save", function (next) {
   next();
 });
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *         - password
+ *         - role
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Auto-generated MongoDB ID
+ *         name:
+ *           type: string
+ *           description: User's full name
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address
+ *         password:
+ *           type: string
+ *           description: User's hashed password
+ *         role:
+ *           type: string
+ *           enum: [ATHLETE, INSTRUCTOR, ADMIN]
+ *           description: User's role in the system
+ *         belt:
+ *           type: string
+ *           enum: [WHITE, YELLOW, ORANGE, GREEN, BLUE, BROWN, BLACK]
+ *           description: User's current belt level (for athletes)
+ *         birthDate:
+ *           type: string
+ *           format: date
+ *           description: User's date of birth
+ *         suspended:
+ *           type: boolean
+ *           description: Whether the user is suspended
+ *         avatarUrl:
+ *           type: string
+ *           description: URL to user's avatar image
+ */
+
 export default mongoose.model<IUser>("User", UserSchema);

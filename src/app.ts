@@ -5,6 +5,8 @@ import { db } from './utils/dbConection';
 import cors from 'cors';
 import path from 'path';
 import athleteRoutes from './api/routes/athletes'; // Corrigindo o caminho
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpecs from './config/swagger';
 
 const PORT = config.port;
 const app = express();
@@ -28,5 +30,8 @@ for (const route of router) {
 
 // Nova rota para atletas
 app.use('/api/athletes', athleteRoutes);
+
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
